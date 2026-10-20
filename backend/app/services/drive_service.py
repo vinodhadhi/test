@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 import re
 from typing import Any
-from uuid import uuid4
 
 from google.auth.exceptions import GoogleAuthError
 from google.oauth2 import service_account
@@ -27,6 +27,12 @@ class DriveStorageError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class DriveUpload:
+    file_id: str
+    path: str
+
+
 class DriveService:
     """Private Google Drive storage adapter; replaceable behind the attachment API."""
 
@@ -36,15 +42,6 @@ class DriveService:
     @property
     def local_root(self) -> Path:
         return Path(__file__).resolve().parents[2] / "local_attachments"
-
-    def _use_local_storage(self) -> bool:
-        if self._client is not None:
-            return False
-        credentials_path = settings.google_application_credentials
-        credentials_missing = not credentials_path or not Path(credentials_path).is_file()
-        return settings.app_env.lower() in {"development", "dev", "test"} and (
-            credentials_missing or not settings.drive_shared_folder_id
-        )
 
     def _local_path(self, file_id: str) -> Path:
         opaque_id = file_id.removeprefix("local:")
@@ -105,18 +102,16 @@ class DriveService:
         ).execute()
         return result["id"]
 
-    def upload(self, *, project_id: int, bug_no: int, file_name: str, mime_type: str, content: bytes) -> str:
-        if self._use_local_storage():
-            self.local_root.mkdir(mode=0o700, parents=True, exist_ok=True)
-            file_id = f"local:{uuid4().hex}"
-            try:
-                self._local_path(file_id).write_bytes(content)
-            except OSError as exc:
-                raise DriveStorageError("Could not save the local development attachment") from exc
-            return file_id
+    def upload(self, *, project_id: int, bug_no: int, file_name: str, mime_type: str, content: bytes) -> DriveUpload:
+        if self._client is None and (not settings.google_application_credentials or not Path(settings.google_application_credentials).is_file()):
+            raise DriveStorageError("Google Drive credentials are not available on the backend host")
+        if not settings.drive_shared_folder_id:
+            raise DriveStorageError("DRIVE_SHARED_FOLDER_ID is not configured")
         try:
-            folder_id = self.bug_folder(project_id, bug_no)
-            return self._upload(folder_id, file_name, mime_type, content)
+            project_folder = self._get_or_create_folder(f"project-{project_id}", settings.drive_shared_folder_id)
+            bug_folder = self._get_or_create_folder(f"bug-{bug_no}", project_folder)
+            file_id = self._upload(bug_folder, file_name, mime_type, content)
+            return DriveUpload(file_id=file_id, path=f"drive://{settings.drive_shared_folder_id}/{project_folder}/{bug_folder}/{file_id}")
         except DriveStorageError:
             raise
         except HttpError as exc:

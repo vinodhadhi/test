@@ -115,6 +115,7 @@ class Attachment(Base):
     uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     kind: Mapped[AttachmentKind] = mapped_column(Enum(AttachmentKind, name="attachment_kind", values_callable=lambda enum: [item.value for item in enum]), nullable=False)
     drive_file_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    drive_path: Mapped[str | None] = mapped_column(String(1024))
     file_name: Mapped[str] = mapped_column(String(255), nullable=False)
     mime_type: Mapped[str] = mapped_column(String(150), nullable=False)
     size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)

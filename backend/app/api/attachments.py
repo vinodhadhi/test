@@ -82,11 +82,11 @@ async def upload_attachment(
     if mime.startswith("image/"):
         mime = filetype.guess_mime(content) or mime
     try:
-        drive_id = drive_service.upload(project_id=bug.project_id, bug_no=bug.bug_no, file_name=safe_name, mime_type=mime, content=content)
+        uploaded = drive_service.upload(project_id=bug.project_id, bug_no=bug.bug_no, file_name=safe_name, mime_type=mime, content=content)
     except DriveStorageError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     attachment = Attachment(
-        bug_id=bug.id, uploaded_by=actor.id, kind=_kind_for(mime), drive_file_id=drive_id,
+        bug_id=bug.id, uploaded_by=actor.id, kind=_kind_for(mime), drive_file_id=uploaded.file_id, drive_path=uploaded.path,
         file_name=safe_name, mime_type=mime, size_bytes=total, duration_seconds=duration_seconds,
     )
     db.add(attachment)
@@ -96,7 +96,7 @@ async def upload_attachment(
     except SQLAlchemyError as exc:
         db.rollback()
         try:
-            drive_service.delete(drive_id)
+            drive_service.delete(uploaded.file_id)
         except DriveStorageError:
             pass
         raise HTTPException(status_code=500, detail="Attachment metadata could not be saved") from exc
