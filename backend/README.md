@@ -19,6 +19,8 @@ Login accepts a user ID and password. Password hashes use Argon2id. Access and r
 
 All bug reads and writes check the authenticated role and record ownership or project membership in the service layer. Each status transition and its associated history row are committed together. Managers can view dashboards and manage projects, modules, Tester/Developer accounts, and project assignments. Admins retain full user administration, including editing, deactivation, and password resets.
 
+The manager's Team assignments view uses `GET /manager/team/workload` to show each active tester and developer's current projects, recorded former assignments, earlier project work inferred from bugs, and open issue counts. Assignment history starts with the migration that introduces it; older removed memberships cannot be reconstructed unless those users have issue records in that project.
+
 ## Google Drive Shared Drive
 
 Create or choose a folder inside the team's Shared Drive and set its ID as `DRIVE_SHARED_FOLDER_ID`. Add the service account email from its JSON key as a Shared Drive member with permission to create and read files. Set `GOOGLE_APPLICATION_CREDENTIALS` to the key file path on the backend host; the key itself must not be added to the repository. Files remain private in Drive and are streamed through the API only after bug access is checked.

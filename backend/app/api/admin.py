@@ -9,6 +9,7 @@ from app.api.deps import get_db, require_admin, require_csrf
 from app.core.security import hash_password
 from app.models.project import Module, Project, ProjectMember
 from app.models.user import User, UserRole
+from app.services.project_assignments import replace_project_members as update_project_membership
 from app.schemas.admin import (
     ModuleCreate,
     ModuleOut,
@@ -157,7 +158,7 @@ def replace_project_members(project_id: int, payload: ProjectMembersUpdate, db: 
         raise HTTPException(status_code=422, detail="One or more user IDs do not exist")
     if any(not user.is_active or user.role not in {UserRole.TESTER, UserRole.DEVELOPER} for user in users):
         raise HTTPException(status_code=422, detail="Only active testers and developers can be assigned to a project")
-    project.members[:] = [ProjectMember(user=user) for user in users]
+    update_project_membership(db, project, users)
     db.commit()
     return users
 

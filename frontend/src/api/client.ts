@@ -16,6 +16,7 @@ export type DashboardModule = { module_id: number; module_name: string; project_
 export type DashboardTester = { user_id: number; full_name: string; raised: number; to_retest: number; verified: number; reopened: number }
 export type DashboardDeveloper = { user_id: number; full_name: string; assigned: number; to_do: number; in_progress: number; done: number }
 export type PersonalDashboard = { role: 'Tester' | 'Developer'; assigned_projects: number; total: number; open: number; reopened: number; in_progress: number; fixed: number; verified: number; recent: { id: number; bug_no: number; project_id: number; project_name: string; title: string; status: BugStatus; severity: BugSeverity; updated_at: string }[] }
+export type TeamWorkload = { user_id: number; full_name: string; role: 'Tester' | 'Developer'; current_projects: { id: number; name: string }[]; past_projects: { id: number; name: string }[]; other_project_work: { id: number; name: string }[]; active_issues: number; to_retest: number; total_issues: number }
 
 // Empty VITE_API_URL uses the current origin; the production web server proxies
 // API paths to the backend, which also works when accessed from another device.
@@ -92,6 +93,7 @@ export const endpoints = {
   dashboardTesters: () => api<DashboardTester[]>('/dashboard/testers'),
   dashboardDevelopers: () => api<DashboardDeveloper[]>('/dashboard/developers'),
   managerUsers: () => api<User[]>('/manager/users'),
+  managerTeamWorkload: () => api<TeamWorkload[]>('/manager/team/workload'),
   managerCreateUser: (data: { user_id: string; full_name: string; role: 'Tester' | 'Developer'; password: string }) => api<User>('/manager/users', { method: 'POST', body: JSON.stringify(data) }),
   managerProjects: () => api<Project[]>('/manager/projects'),
   managerCreateProject: (data: { name: string; description: string }) => api<Project>('/manager/projects', { method: 'POST', body: JSON.stringify(data) }),

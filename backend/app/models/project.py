@@ -29,6 +29,16 @@ class ProjectMember(Base):
     user: Mapped["User"] = relationship()
 
 
+class ProjectAssignmentHistory(Base):
+    __tablename__ = "project_assignment_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class Module(Base):
     __tablename__ = "modules"
     __table_args__ = (UniqueConstraint("project_id", "name", name="uq_modules_project_name"),)
