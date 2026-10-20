@@ -31,6 +31,8 @@ Requirements: Python 3.12+, Node.js 20+, and a Supabase project (or a local MySQ
 4. Open `http://localhost:5173`. The Vite development proxy sends API requests to `http://localhost:8000`; for a backend on another host, set `VITE_API_PROXY_TARGET` before starting Vite.
 
    Bug discussions use `/ws/bugs/{id}/chat` for live comments and typing indicators. The Vite proxy forwards WebSocket upgrades automatically. A production reverse proxy must forward WebSocket upgrades for `/ws` to the backend. The live event hub is in memory, so run one API worker until a shared pub/sub service is added; comments remain stored in PostgreSQL and clients refetch them on reconnect.
+
+   Voice and screen capture use the browser MediaRecorder API. Open the app on `localhost` or serve it over HTTPS; browsers generally block microphone and screen capture on plain HTTP LAN addresses. The attachment API supports byte ranges for audio and video playback.
 5. In a third PowerShell window, create demo users and data (optional):
 
    ```powershell

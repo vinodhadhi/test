@@ -2,7 +2,7 @@ from io import BytesIO
 from urllib.parse import quote
 
 import filetype
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -104,7 +104,7 @@ async def upload_attachment(
 
 
 @router.get("/attachments/{attachment_id}/download")
-def download_attachment(attachment_id: int, actor: User = Depends(current_user), db: Session = Depends(get_db)) -> StreamingResponse:
+def download_attachment(attachment_id: int, range_header: str | None = Header(default=None, alias="Range"), actor: User = Depends(current_user), db: Session = Depends(get_db)) -> StreamingResponse:
     attachment = db.get(Attachment, attachment_id)
     if attachment is None:
         raise HTTPException(status_code=404, detail="Attachment not found")
@@ -120,5 +120,27 @@ def download_attachment(attachment_id: int, actor: User = Depends(current_user),
         "X-Content-Type-Options": "nosniff",
         "Content-Security-Policy": "default-src 'none'; sandbox",
         "Cache-Control": "private, no-store",
+        "Accept-Ranges": "bytes",
     }
+    if range_header:
+        import re
+
+        total_length = len(content)
+        match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+        if not match or not any(match.groups()) or not content:
+            raise HTTPException(status_code=416, detail="Invalid byte range", headers={"Content-Range": f"bytes */{len(content)}"})
+        first, last = match.groups()
+        if first:
+            start = int(first)
+            end = min(int(last), len(content) - 1) if last else len(content) - 1
+        else:
+            length = int(last)
+            start = max(0, len(content) - length)
+            end = len(content) - 1
+        if start >= len(content) or end < start or (not first and length == 0):
+            raise HTTPException(status_code=416, detail="Invalid byte range", headers={"Content-Range": f"bytes */{len(content)}"})
+        content = content[start:end + 1]
+        headers["Content-Range"] = f"bytes {start}-{end}/{total_length}"
+        headers["Content-Length"] = str(len(content))
+        return StreamingResponse(BytesIO(content), status_code=206, media_type=attachment.mime_type, headers=headers)
     return StreamingResponse(BytesIO(content), media_type=attachment.mime_type, headers=headers)

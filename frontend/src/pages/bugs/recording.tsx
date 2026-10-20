@@ -22,7 +22,11 @@ export function Recorder({ onAdd }: { onAdd: (recording: RecordedFile) => void }
     try {
       const media = kind === 'voice' ? await navigator.mediaDevices.getUserMedia({ audio: true }) : await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
       stream.current = media
-      const options = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? { mimeType: 'video/webm;codecs=vp9,opus' } : undefined
+      const candidates = kind === 'voice'
+        ? ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
+        : ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4']
+      const supported = candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType))
+      const options = supported ? { mimeType: supported } : undefined
       const activeRecorder = new MediaRecorder(media, options)
       const chunks: BlobPart[] = []
       started.current = Date.now()
@@ -30,7 +34,7 @@ export function Recorder({ onAdd }: { onAdd: (recording: RecordedFile) => void }
       activeRecorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data) }
       activeRecorder.onstop = () => {
         const duration = Math.min(120, Math.max(1, Math.round((Date.now() - started.current) / 1000)))
-        const mime = activeRecorder.mimeType || (kind === 'voice' ? 'audio/webm' : 'video/webm')
+        const mime = activeRecorder.mimeType || supported || (kind === 'voice' ? 'audio/webm' : 'video/webm')
         const extension = mime.includes('mp4') ? 'mp4' : 'webm'
         const file = new File(chunks, `${kind}-recording-${Date.now()}.${extension}`, { type: mime })
         const item = { file, previewUrl: URL.createObjectURL(file), duration, kind }
