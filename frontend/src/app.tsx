@@ -13,6 +13,7 @@ import { ReportBugPage } from './pages/bugs/report'
 import { BugWorkspaceLayout } from './components/bug-workspace-layout'
 import { ManagerTeamPage } from './pages/manager/team'
 import { ManagerTeamAccountsPage } from './pages/manager/team-accounts'
+import { PersonalDashboardPage } from './pages/personal-dashboard'
 const DashboardPage = lazy(() => import('./pages/dashboard').then((module) => ({ default: module.DashboardPage })))
 
 function RoleGuard({ roles }: { roles: string[] }) {
@@ -28,7 +29,7 @@ function HomeRedirect() {
   const user = useQuery({ queryKey: ['me'], queryFn: endpoints.me, retry: false })
   if (user.isPending) return <div className="page-center"><div className="spinner" /></div>
   if (user.isError) return <Navigate to="/login" replace />
-  return <Navigate to={user.data.role === 'Admin' ? '/admin' : user.data.role === 'Manager' ? '/dashboard' : user.data.role === 'Tester' || user.data.role === 'Developer' ? '/bugs' : '/login'} replace />
+  return <Navigate to={user.data.role === 'Admin' ? '/admin' : user.data.role === 'Manager' ? '/dashboard' : user.data.role === 'Tester' || user.data.role === 'Developer' ? '/my-dashboard' : '/login'} replace />
 }
 
 export default function App() {
@@ -47,6 +48,9 @@ export default function App() {
         <Route path="users" element={<UsersPage />} />
         <Route path="projects" element={<ProjectsPage />} />
       </Route>
+    </Route>
+    <Route element={<RoleGuard roles={['Tester', 'Developer']} />}>
+      <Route path="/my-dashboard" element={<BugWorkspaceLayout />}><Route index element={<PersonalDashboardPage />} /></Route>
     </Route>
     <Route element={<RoleGuard roles={['Admin', 'Manager', 'Tester', 'Developer']} />}>
       <Route path="/bugs" element={<BugWorkspaceLayout />}>

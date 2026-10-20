@@ -58,7 +58,7 @@ Frontend check (from `frontend`): `npm run build`.
 
 - **Admin:** user and project administration, bug access, reporting, dashboards.
 - **Manager:** dashboards, read-only issue tracking, project/module management, Tester/Developer account creation, and separate project team assignments.
-- **Tester:** report bugs in assigned projects, comment, and verify or reopen reported bugs.
-- **Developer:** work on assigned bugs and record status changes.
+- **Tester:** personal dashboard for reports and retests; report bugs in assigned projects, comment, and verify or reopen reported bugs. The issue list separates personal reports from project issues.
+- **Developer:** personal dashboard and queue for assigned bugs and status changes.
 
 The application currently authenticates its own user records; Supabase Auth keys are optional metadata and do not enable Supabase Auth login. The Supabase secret key is not needed. Never place it in the frontend. In production, use HTTPS, `APP_ENV=production`, `COOKIE_SECURE=true`, and an HTTPS `FRONTEND_ORIGIN`.

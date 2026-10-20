@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Paperclip, Send, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -15,6 +15,7 @@ const MAX_BYTES = 25 * 1024 * 1024
 
 export function ReportBugPage() {
   const navigate = useNavigate()
+  const client = useQueryClient()
   const me = useQuery({ queryKey: ['me'], queryFn: endpoints.me })
   const projects = useQuery({ queryKey: ['my-projects'], queryFn: endpoints.myProjects })
   const [files, setFiles] = useState<File[]>([])
@@ -36,7 +37,7 @@ export function ReportBugPage() {
     } catch (error) {
       return { bug, attachmentError: error instanceof Error ? error.message : 'An attachment could not be uploaded.' }
     }
-  }, onSuccess: ({ bug, attachmentError }) => navigate(`/bugs/${bug.id}`, { replace: true, state: { notice: `Bug #${bug.bug_no} was reported.`, warning: attachmentError ? `The bug was saved, but an attachment did not upload: ${attachmentError}` : undefined } }), onError: (error: Error) => setClientError(error.message) })
+  }, onSuccess: ({ bug, attachmentError }) => { client.invalidateQueries({ queryKey: ['dashboard'] }); client.invalidateQueries({ queryKey: ['bugs'] }); navigate(`/bugs/${bug.id}`, { replace: true, state: { notice: `Bug #${bug.bug_no} was reported.`, warning: attachmentError ? `The bug was saved, but an attachment did not upload: ${attachmentError}` : undefined } }) }, onError: (error: Error) => setClientError(error.message) })
 
   const addFiles = (incoming: FileList | null) => {
     setClientError('')

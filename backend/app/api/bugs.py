@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import String, cast, func, or_, select
@@ -6,10 +6,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.deps import current_user, get_db, require_csrf
-from app.models.bug import Attachment, Bug, BugComment, BugHistory, BugSeverity, BugStatus
+from app.models.bug import Bug, BugComment, BugHistory, BugSeverity, BugStatus
 from app.models.project import Module, Project, ProjectMember
 from app.models.user import User, UserRole
 from app.schemas.bugs import (
+    AttachmentOut,
     BugCreate,
     BugOut,
     BugPage,
@@ -46,7 +47,7 @@ def _bug_out(db: Session, bug: Bug, *, include_thread: bool = False) -> BugOut:
         "created_at": bug.created_at, "updated_at": bug.updated_at,
         "reporter_name": bug.reporter.full_name, "assignee_name": bug.assignee.full_name,
         "project_name": bug.project.name, "module_name": bug.module.name,
-        "attachments": [Attachment.model_validate(a, from_attributes=True) for a in bug.attachments],
+        "attachments": [AttachmentOut.model_validate(a, from_attributes=True) for a in bug.attachments],
     }
     if include_thread:
         comments = db.execute(select(BugComment, User.full_name).join(User, User.id == BugComment.user_id).where(BugComment.bug_id == bug.id).order_by(BugComment.created_at, BugComment.id)).all()
@@ -97,6 +98,7 @@ def list_bugs(
     severity: BugSeverity | None = None,
     assignee: int | None = None,
     reporter: int | None = None,
+    scope: Literal["mine", "project"] = "mine",
     search: Annotated[str | None, Query(max_length=200)] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 25,
@@ -109,6 +111,8 @@ def list_bugs(
     elif actor.role == UserRole.TESTER:
         member_projects = select(ProjectMember.project_id).where(ProjectMember.user_id == actor.id)
         base = base.where(Bug.project_id.in_(member_projects))
+        if scope == "mine":
+            base = base.where(Bug.reported_by == actor.id)
     if project is not None:
         base = base.where(Bug.project_id == project)
     if module is not None:

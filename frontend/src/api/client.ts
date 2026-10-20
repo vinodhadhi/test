@@ -15,6 +15,7 @@ export type DashboardProject = { project_id: number; project_name: string; total
 export type DashboardModule = { module_id: number; module_name: string; project_name: string; total: number; verified: number }
 export type DashboardTester = { user_id: number; full_name: string; raised: number; to_retest: number; verified: number; reopened: number }
 export type DashboardDeveloper = { user_id: number; full_name: string; assigned: number; to_do: number; in_progress: number; done: number }
+export type PersonalDashboard = { role: 'Tester' | 'Developer'; assigned_projects: number; total: number; open: number; reopened: number; in_progress: number; fixed: number; verified: number; recent: { id: number; bug_no: number; project_id: number; project_name: string; title: string; status: BugStatus; severity: BugSeverity; updated_at: string }[] }
 
 // Empty VITE_API_URL uses the current origin; the production web server proxies
 // API paths to the backend, which also works when accessed from another device.
@@ -79,6 +80,7 @@ export const endpoints = {
   uploadAttachment: (id: number, file: File, duration_seconds?: number) => { const form = new FormData(); form.append('file', file); if (duration_seconds !== undefined) form.append('duration_seconds', String(duration_seconds)); return api<Attachment>(`/bugs/${id}/attachments`, { method: 'POST', body: form }) },
   attachmentUrl: (id: number) => `${apiBase}/attachments/${id}/download`,
   dashboardSummary: () => api<DashboardSummary>('/dashboard/summary'),
+  personalDashboard: () => api<PersonalDashboard>('/dashboard/me'),
   dashboardProjects: () => api<DashboardProject[]>('/dashboard/by-project'),
   dashboardModules: () => api<DashboardModule[]>('/dashboard/by-module'),
   dashboardTesters: () => api<DashboardTester[]>('/dashboard/testers'),

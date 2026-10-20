@@ -31,7 +31,7 @@ export function BugDetailPage() {
   const [transitionComment, setTransitionComment] = useState('')
   const [actionError, setActionError] = useState('')
   const stateNotice = (location.state as { notice?: string; warning?: string } | null)
-  const refreshBug = () => { client.invalidateQueries({ queryKey: ['bug', bugId] }); client.invalidateQueries({ queryKey: ['bugs'] }) }
+  const refreshBug = () => { client.invalidateQueries({ queryKey: ['bug', bugId] }); client.invalidateQueries({ queryKey: ['bugs'] }); client.invalidateQueries({ queryKey: ['dashboard'] }) }
   const transition = useMutation({ mutationFn: (target: BugStatus) => endpoints.transitionBug(bugId, target, transitionComment.trim() || undefined), onSuccess: () => { setActionError(''); setTransitionComment(''); refreshBug() }, onError: (error: Error) => setActionError(error.message) })
   const addComment = useMutation({ mutationFn: () => endpoints.addComment(bugId, comment.trim()), onSuccess: () => { setComment(''); refreshBug() }, onError: (error: Error) => setActionError(error.message) })
   const upload = useMutation({ mutationFn: async (files: FileList) => { for (const file of Array.from(files)) await endpoints.uploadAttachment(bugId, file); return true }, onSuccess: refreshBug, onError: (error: Error) => setActionError(error.message) })

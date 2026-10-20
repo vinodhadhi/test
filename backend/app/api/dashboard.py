@@ -1,18 +1,49 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import current_user, get_db
 from app.models.bug import Bug, BugStatus
-from app.models.project import Module, Project
+from app.models.project import Module, Project, ProjectMember
 from app.models.user import User, UserRole
+from app.schemas.dashboard import PersonalDashboardOut, PersonalIssueOut
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
-def _require_dashboard_role(user: User) -> None:
-    from fastapi import HTTPException
+@router.get("/me", response_model=PersonalDashboardOut)
+def personal_dashboard(user: User = Depends(current_user), db: Session = Depends(get_db)) -> PersonalDashboardOut:
+    if user.role not in {UserRole.TESTER, UserRole.DEVELOPER}:
+        raise HTTPException(status_code=403, detail="Personal dashboard is for testers and developers")
 
+    user_column = Bug.reported_by if user.role == UserRole.TESTER else Bug.assigned_to
+    filters = [user_column == user.id]
+    if user.role == UserRole.TESTER:
+        assigned_project_ids = select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)
+        filters.append(Bug.project_id.in_(assigned_project_ids))
+    counts = dict(db.execute(select(Bug.status, func.count(Bug.id)).where(*filters).group_by(Bug.status)).all())
+    recent = db.execute(
+        select(Bug.id, Bug.bug_no, Bug.project_id, Project.name.label("project_name"), Bug.title, Bug.status, Bug.severity, Bug.updated_at)
+        .join(Project, Project.id == Bug.project_id)
+        .where(*filters)
+        .order_by(Bug.updated_at.desc(), Bug.id.desc())
+        .limit(6)
+    ).all()
+    assigned_projects = db.scalar(select(func.count()).select_from(ProjectMember).where(ProjectMember.user_id == user.id)) or 0
+    return PersonalDashboardOut(
+        role=user.role,
+        assigned_projects=assigned_projects,
+        total=sum(counts.values()),
+        open=counts.get(BugStatus.OPEN, 0),
+        reopened=counts.get(BugStatus.REOPENED, 0),
+        in_progress=counts.get(BugStatus.IN_PROGRESS, 0),
+        fixed=counts.get(BugStatus.FIXED, 0),
+        verified=counts.get(BugStatus.VERIFIED, 0),
+        recent=[PersonalIssueOut.model_validate(row._mapping) for row in recent],
+    )
+
+
+def _require_dashboard_role(user: User) -> None:
     if user.role not in {UserRole.ADMIN, UserRole.MANAGER}:
         raise HTTPException(status_code=403, detail="Dashboard access required")
 
