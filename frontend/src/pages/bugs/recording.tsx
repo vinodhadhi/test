@@ -10,17 +10,33 @@ export function Recorder({ onAdd }: { onAdd: (recording: RecordedFile) => void }
   const timer = useRef<number | null>(null)
   const started = useRef(0)
   const [active, setActive] = useState<'voice' | 'screen' | null>(null)
+  const [starting, setStarting] = useState(false)
   const [seconds, setSeconds] = useState(0)
   const [error, setError] = useState('')
   const [preview, setPreview] = useState<RecordedFile | null>(null)
   const closeStream = () => { stream.current?.getTracks().forEach((track) => track.stop()); stream.current = null }
 
-  useEffect(() => () => { if (timer.current) window.clearInterval(timer.current); closeStream(); if (preview) URL.revokeObjectURL(preview.previewUrl) }, [preview])
+  const previewRef = useRef<RecordedFile | null>(null)
+  const secureContext = window.isSecureContext
+  const captureAvailable = secureContext && !!navigator.mediaDevices && typeof MediaRecorder !== 'undefined'
+  const localhostUrl = `http://localhost:${window.location.port}${window.location.pathname}${window.location.search}`
+
+  useEffect(() => { previewRef.current = preview }, [preview])
+  useEffect(() => () => {
+    if (timer.current) window.clearInterval(timer.current)
+    if (recorder.current?.state === 'recording') recorder.current.stop()
+    closeStream()
+    if (previewRef.current) URL.revokeObjectURL(previewRef.current.previewUrl)
+  }, [])
 
   const start = async (kind: 'voice' | 'screen') => {
     setError('')
+    if (!secureContext) { setError('Recording requires a secure page. On this computer, open the app using localhost; on another device, use HTTPS.'); return }
+    if (!captureAvailable) { setError('This browser does not support recording here. Try current Chrome or Edge on a secure page.'); return }
+    if (kind === 'screen' && !navigator.mediaDevices.getDisplayMedia) { setError('Screen sharing is unavailable in this browser.'); return }
+    setStarting(true)
     try {
-      const media = kind === 'voice' ? await navigator.mediaDevices.getUserMedia({ audio: true }) : await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+      const media = kind === 'voice' ? await navigator.mediaDevices.getUserMedia({ audio: true }) : await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
       stream.current = media
       const candidates = kind === 'voice'
         ? ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']
@@ -32,7 +48,9 @@ export function Recorder({ onAdd }: { onAdd: (recording: RecordedFile) => void }
       started.current = Date.now()
       recorder.current = activeRecorder
       activeRecorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data) }
+      activeRecorder.onerror = () => setError('Recording stopped because the browser reported a media error. Please try again.')
       activeRecorder.onstop = () => {
+        if (!chunks.length) { setError('The recording was empty. Record for a few seconds and try again.'); closeStream(); setActive(null); return }
         const duration = Math.min(120, Math.max(1, Math.round((Date.now() - started.current) / 1000)))
         const mime = activeRecorder.mimeType || supported || (kind === 'voice' ? 'audio/webm' : 'video/webm')
         const extension = mime.includes('mp4') ? 'mp4' : 'webm'
@@ -43,13 +61,16 @@ export function Recorder({ onAdd }: { onAdd: (recording: RecordedFile) => void }
         setActive(null)
       }
       activeRecorder.start(500)
+      setStarting(false)
       setActive(kind)
       setSeconds(0)
       timer.current = window.setInterval(() => { const elapsed = Math.floor((Date.now() - started.current) / 1000); setSeconds(elapsed); if (elapsed >= 120) stop() }, 500)
       media.getVideoTracks().forEach((track) => { track.onended = () => stop() })
     } catch (reason) {
       closeStream()
-      setError(reason instanceof Error ? reason.message : 'Could not start recording. Check browser permissions.')
+      const name = reason instanceof DOMException ? reason.name : ''
+      setError(name === 'NotAllowedError' ? 'Recording permission was denied. Allow microphone or screen sharing in your browser, then try again.' : reason instanceof Error ? reason.message : 'Could not start recording. Check browser permissions.')
+      setStarting(false)
     }
   }
 
@@ -58,13 +79,15 @@ export function Recorder({ onAdd }: { onAdd: (recording: RecordedFile) => void }
     timer.current = null
     if (recorder.current?.state === 'recording') recorder.current.stop()
   }
-  const accept = () => { if (!preview) return; onAdd(preview); setPreview(null) }
+  const accept = () => { if (!preview) return; onAdd(preview); previewRef.current = null; setPreview(null) }
   const discard = () => { if (preview) URL.revokeObjectURL(preview.previewUrl); setPreview(null) }
 
   return <div className="recorder-box">
     <Notice tone="info">Voice and screen recordings can contain sensitive information. Review each recording before attaching it. Recordings are limited to 2 minutes and retained for the configured period.</Notice>
+    {!secureContext && <Notice tone="info">Recording is blocked on this HTTP address. {['localhost', '127.0.0.1'].includes(window.location.hostname) ? 'Use HTTPS for capture.' : <>If you are using this computer, <a href={localhostUrl}>open the app on localhost</a>. Other devices need HTTPS.</>}</Notice>}
+    {secureContext && !captureAvailable && <Notice>This browser cannot access recording APIs on this page.</Notice>}
     {error && <Notice>{error}</Notice>}
-    {!active && !preview && <div className="recorder-actions"><Button type="button" variant="secondary" onClick={() => start('voice')}><Mic size={15} /> Record voice</Button><Button type="button" variant="secondary" onClick={() => start('screen')}><MonitorUp size={15} /> Record screen</Button></div>}
+    {!active && !preview && <div className="recorder-actions"><Button type="button" variant="secondary" disabled={!captureAvailable || starting} onClick={() => start('voice')}><Mic size={15} /> {starting ? 'Starting…' : 'Record voice'}</Button><Button type="button" variant="secondary" disabled={!captureAvailable || starting || !navigator.mediaDevices?.getDisplayMedia} onClick={() => start('screen')}><MonitorUp size={15} /> Record screen</Button></div>}
     {active && <div className="recording-live"><span className="recording-dot" /><span>{active === 'voice' ? 'Voice recording' : 'Screen recording'}</span><b>{String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')} / 02:00</b><Button type="button" variant="danger" onClick={stop}><Square size={13} fill="currentColor" /> Stop</Button></div>}
     {preview && <div className="record-preview"><div><b>Preview recording</b><small>{preview.file.name} · {preview.duration}s · {(preview.file.size / 1024 / 1024).toFixed(1)} MB</small></div>{preview.kind === 'voice' ? <audio controls src={preview.previewUrl} /> : <video controls src={preview.previewUrl} /> }<div className="recorder-actions"><Button type="button" onClick={accept}>Attach recording</Button><Button type="button" variant="ghost" onClick={discard}><Trash2 size={15} /> Discard</Button></div></div>}
   </div>

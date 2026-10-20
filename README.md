@@ -32,7 +32,7 @@ Requirements: Python 3.12+, Node.js 20+, and a Supabase project (or a local MySQ
 
    Bug discussions use `/ws/bugs/{id}/chat` for live comments and typing indicators. The Vite proxy forwards WebSocket upgrades automatically. A production reverse proxy must forward WebSocket upgrades for `/ws` to the backend. The live event hub is in memory, so run one API worker until a shared pub/sub service is added; comments remain stored in PostgreSQL and clients refetch them on reconnect.
 
-   Voice and screen capture use the browser MediaRecorder API. Open the app on `localhost` or serve it over HTTPS; browsers generally block microphone and screen capture on plain HTTP LAN addresses. The attachment API supports byte ranges for audio and video playback.
+   Voice and screen capture use the browser MediaRecorder API. On the same computer, use `http://localhost:5173` (or the Vite port shown in the terminal). Browsers block capture on plain HTTP LAN addresses such as `http://172.x.x.x:5173`. For other devices, use HTTPS with a certificate trusted by those devices. Set `VITE_HTTPS_KEY` and `VITE_HTTPS_CERT` to the key and certificate file paths before running Vite to enable HTTPS. The attachment API supports byte ranges for audio and video playback. Uploading a finished recording also requires valid Google Drive credentials on the backend.
 5. In a third PowerShell window, create demo users and data (optional):
 
    ```powershell
