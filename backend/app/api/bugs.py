@@ -44,7 +44,7 @@ def _bug_out(db: Session, bug: Bug, *, include_thread: bool = False) -> BugOut:
         "actual_result": bug.actual_result, "severity": bug.severity, "priority": bug.priority,
         "type": bug.type, "status": bug.status, "reported_by": bug.reported_by,
         "assigned_to": bug.assigned_to, "fixed_by": bug.fixed_by, "verified_by": bug.verified_by,
-        "environment": bug.environment, "build_version": bug.build_version,
+        "environment": bug.environment, "build_version": bug.build_version, "reference_url": bug.reference_url,
         "created_at": bug.created_at, "updated_at": bug.updated_at,
         "reporter_name": bug.reporter.full_name, "assignee_name": bug.assignee.full_name,
         "project_name": bug.project.name, "module_name": bug.module.name,

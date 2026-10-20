@@ -1,11 +1,20 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StringConstraints, TypeAdapter, field_validator
 
 from app.models.bug import AttachmentKind, BugSeverity, BugStatus, BugType
 
 BugText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+def validate_reference_url(value: str | None) -> str | None:
+    if value is None or not value.strip():
+        return None
+    normalized = str(TypeAdapter(HttpUrl).validate_python(value.strip()))
+    if len(normalized) > 2048:
+        raise ValueError("Reference URL must be 2048 characters or fewer")
+    return normalized
 
 
 class BugCreate(BaseModel):
@@ -21,6 +30,9 @@ class BugCreate(BaseModel):
     assigned_to: int
     environment: Annotated[str | None, StringConstraints(max_length=300)] = None
     build_version: Annotated[str | None, StringConstraints(max_length=100)] = None
+    reference_url: str | None = None
+
+    _reference_url = field_validator("reference_url")(validate_reference_url)
 
 
 class BugPatch(BaseModel):
@@ -35,6 +47,9 @@ class BugPatch(BaseModel):
     assigned_to: int | None = None
     environment: Annotated[str | None, StringConstraints(max_length=300)] = None
     build_version: Annotated[str | None, StringConstraints(max_length=100)] = None
+    reference_url: str | None = None
+
+    _reference_url = field_validator("reference_url")(validate_reference_url)
 
 
 class TransitionRequest(BaseModel):
@@ -98,6 +113,7 @@ class BugOut(BaseModel):
     verified_by: int | None
     environment: str | None
     build_version: str | None
+    reference_url: str | None
     created_at: datetime
     updated_at: datetime
     reporter_name: str
