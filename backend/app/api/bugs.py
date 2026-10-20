@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.deps import current_user, get_db, require_csrf
+from app.api.chat import hub
 from app.models.bug import Bug, BugComment, BugHistory, BugSeverity, BugStatus
 from app.models.project import Module, Project, ProjectMember
 from app.models.user import User, UserRole
@@ -180,5 +181,7 @@ def add_comment(bug_id: int, payload: CommentCreate, actor: User = Depends(curre
     db.add(comment)
     db.commit()
     db.refresh(comment)
-    return CommentOut(id=comment.id, bug_id=comment.bug_id, user_id=comment.user_id, body=comment.body, created_at=comment.created_at, user_name=actor.full_name)
+    result = CommentOut(id=comment.id, bug_id=comment.bug_id, user_id=comment.user_id, body=comment.body, created_at=comment.created_at, user_name=actor.full_name)
+    hub.publish_from_rest(bug.id, {"type": "comment", "comment": result.model_dump(mode="json")})
+    return result
 

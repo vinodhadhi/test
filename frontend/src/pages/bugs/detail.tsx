@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Check, Download, MessageCircle, RotateCcw, Send, UserRound } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { endpoints, type Bug, type BugStatus, type BugSeverity, type BugType } from '../../api/client'
 import { Button, Card, Field, Input, Notice, Select, Textarea } from '../../components/ui'
+import { useBugChat } from './useBugChat'
 
 const transitionMap: Record<BugStatus, BugStatus[]> = { Open: ['In Progress'], 'In Progress': ['Fixed'], Fixed: ['Verified', 'Reopened'], Verified: [], Reopened: ['In Progress'] }
 type BugEdit = Pick<Bug, 'module_id' | 'title' | 'steps' | 'expected_result' | 'actual_result' | 'severity' | 'priority' | 'type' | 'assigned_to' | 'environment' | 'build_version'>
@@ -28,12 +29,24 @@ export function BugDetailPage() {
   const modules = useQuery({ queryKey: ['my-modules', bug.data?.project_id], queryFn: () => endpoints.myModules(bug.data!.project_id), enabled: !!bug.data && editing })
   const developers = useQuery({ queryKey: ['project-developers', bug.data?.project_id], queryFn: () => endpoints.projectDevelopers(bug.data!.project_id), enabled: !!bug.data && editing })
   const [comment, setComment] = useState('')
+  const { connected, typingUsers, sendTyping } = useBugChat(bugId, me.data?.id)
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(typingTimer.current), [])
+  const stopTyping = () => { clearTimeout(typingTimer.current); sendTyping(false) }
+  const updateComment = (value: string) => {
+    setComment(value)
+    if (value.trim()) {
+      sendTyping(true)
+      clearTimeout(typingTimer.current)
+      typingTimer.current = setTimeout(() => sendTyping(false), 2500)
+    } else stopTyping()
+  }
   const [transitionComment, setTransitionComment] = useState('')
   const [actionError, setActionError] = useState('')
   const stateNotice = (location.state as { notice?: string; warning?: string } | null)
   const refreshBug = () => { client.invalidateQueries({ queryKey: ['bug', bugId] }); client.invalidateQueries({ queryKey: ['bugs'] }); client.invalidateQueries({ queryKey: ['dashboard'] }) }
   const transition = useMutation({ mutationFn: (target: BugStatus) => endpoints.transitionBug(bugId, target, transitionComment.trim() || undefined), onSuccess: () => { setActionError(''); setTransitionComment(''); refreshBug() }, onError: (error: Error) => setActionError(error.message) })
-  const addComment = useMutation({ mutationFn: () => endpoints.addComment(bugId, comment.trim()), onSuccess: () => { setComment(''); refreshBug() }, onError: (error: Error) => setActionError(error.message) })
+  const addComment = useMutation({ mutationFn: () => endpoints.addComment(bugId, comment.trim()), onSuccess: () => { setComment(''); stopTyping(); setActionError(''); refreshBug() }, onError: (error: Error) => setActionError(error.message) })
   const upload = useMutation({ mutationFn: async (files: FileList) => { for (const file of Array.from(files)) await endpoints.uploadAttachment(bugId, file); return true }, onSuccess: refreshBug, onError: (error: Error) => setActionError(error.message) })
   const saveEdit = useMutation({ mutationFn: (values: BugEdit) => endpoints.updateBug(bugId, values), onSuccess: () => { setEditing(false); setEditValues(null); setActionError(''); refreshBug() }, onError: (error: Error) => setActionError(error.message) })
 
@@ -69,7 +82,7 @@ export function BugDetailPage() {
           <section className="detail-content"><h2>Steps to reproduce</h2><p className="preserve-lines">{item.steps}</p></section><div className="result-grid"><section className="result-box expected"><h2>Expected result</h2><p className="preserve-lines">{item.expected_result}</p></section><section className="result-box actual"><h2>Actual result</h2><p className="preserve-lines">{item.actual_result}</p></section></div>
           {(item.environment || item.build_version) && <div className="context-line">{item.environment && <span><b>Environment</b> {item.environment}</span>}{item.build_version && <span><b>Build</b> {item.build_version}</span>}</div>}</>}
       </Card>
-      <Card className="detail-section"><div className="detail-section-head"><div><h2><MessageCircle size={16} /> Discussion</h2><span>{item.comments.length} comments</span></div></div><div className="comment-thread">{item.comments.length === 0 ? <div className="thread-empty">No comments yet.</div> : item.comments.map((entry) => <article className="comment-entry" key={entry.id}><div className="avatar avatar-small">{entry.user_name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</div><div className="comment-body"><div className="comment-meta"><b>{entry.user_name}</b><time>{new Date(entry.created_at).toLocaleString()}</time></div><p>{entry.body}</p></div></article>)}</div>{user && user.role !== 'Manager' && <form className="comment-form" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) addComment.mutate() }}><Input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Write a comment…" maxLength={10000} /><Button type="submit" disabled={!comment.trim() || addComment.isPending}><Send size={14} /> Send</Button></form>}</Card>
+      <Card className="detail-section"><div className="detail-section-head"><div><h2><MessageCircle size={16} /> Discussion</h2><span>{item.comments.length} comments <span aria-label={connected ? 'Live chat connected' : 'Live chat reconnecting'} title={connected ? 'Live chat connected' : 'Live chat reconnecting'} className={`chat-connection ${connected ? 'online' : ''}`} /></span></div></div><div className="comment-thread">{item.comments.length === 0 ? <div className="thread-empty">No comments yet.</div> : item.comments.map((entry) => <article className="comment-entry" key={entry.id}><div className="avatar avatar-small">{entry.user_name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</div><div className="comment-body"><div className="comment-meta"><b>{entry.user_name}</b><time>{new Date(entry.created_at).toLocaleString()}</time></div><p>{entry.body}</p></div></article>)}</div>{typingUsers.length > 0 && <div className="chat-typing" role="status"><span>{typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing</span><span className="chat-typing-dots" aria-hidden="true"><i /><i /><i /></span></div>}{user && user.role !== 'Manager' && <form className="comment-form" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) addComment.mutate() }}><Input value={comment} onChange={(event) => updateComment(event.target.value)} onBlur={stopTyping} placeholder="Write a comment…" maxLength={10000} /><Button type="submit" disabled={!comment.trim() || addComment.isPending}><Send size={14} /> Send</Button></form>}</Card>
     </main><aside className="bug-side-column">
       <Card className="side-card"><h2>Assignment</h2><div className="assignee-info"><div className="avatar avatar-small">{item.assignee_name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</div><div><b>{item.assignee_name}</b><small>Assigned developer</small></div></div><div className="reported-info"><UserRound size={14} /><span>Reported by <b>{item.reporter_name}</b></span></div><div className="detail-fact"><span>Issue type</span><b>{item.type}</b></div><div className="detail-fact"><span>Priority</span><b>{item.priority}</b></div></Card>
       <Card className="side-card attachment-card"><div className="side-heading"><h2>Attachments</h2><span>{item.attachments.length}</span></div>{item.attachments.length === 0 ? <p className="side-empty">No attachments.</p> : <div className="attachment-list">{item.attachments.map((attachment) => { const src = endpoints.attachmentUrl(attachment.id); return <div className="attachment-item" key={attachment.id}><div className="attachment-title"><b>{attachment.file_name}</b><small>{(attachment.size_bytes / 1024 / 1024).toFixed(2)} MB{attachment.duration_seconds ? ` · ${attachment.duration_seconds}s` : ''}</small></div>{attachment.mime_type.startsWith('image/') ? <a href={src} target="_blank" rel="noreferrer"><img className="attachment-image" src={src} alt={attachment.file_name} loading="lazy" /></a> : attachment.mime_type.startsWith('video/') ? <Playback src={src} video /> : attachment.mime_type.startsWith('audio/') ? <Playback src={src} /> : <a className="attachment-download" href={src} target="_blank" rel="noreferrer"><Download size={15} /> Open file</a>}</div> })}</div>}{user?.role !== 'Manager' && <label className="attachment-add button button-secondary">{upload.isPending ? 'Uploading…' : 'Add attachment'}<input type="file" hidden multiple accept="image/*,video/webm,video/mp4,audio/webm,audio/mp4,audio/mpeg,application/pdf" disabled={upload.isPending} onChange={(event) => { if (event.target.files?.length) upload.mutate(event.target.files); event.currentTarget.value = '' }} /></label>}</Card>

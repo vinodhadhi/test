@@ -8,6 +8,7 @@ from app.api.attachments import router as attachments_router
 from app.api.auth import limiter
 from app.api.auth import router as auth_router
 from app.api.bugs import router as bugs_router
+from app.api.chat import router as chat_router
 from app.api.dashboard import router as dashboard_router
 from app.api.manager_projects import router as manager_projects_router
 from app.api.project_work import router as project_work_router
@@ -27,6 +28,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(bugs_router)
+app.include_router(chat_router)
 app.include_router(project_work_router)
 app.include_router(attachments_router)
 app.include_router(dashboard_router)

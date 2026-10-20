@@ -21,6 +21,12 @@ export type PersonalDashboard = { role: 'Tester' | 'Developer'; assigned_project
 // API paths to the backend, which also works when accessed from another device.
 const apiBase = import.meta.env.VITE_API_URL ?? ''
 
+export function chatSocketUrl(bugId: number): string {
+  const url = new URL(`${apiBase}/ws/bugs/${bugId}/chat`, window.location.origin)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  return url.toString()
+}
+
 function csrfToken() {
   return document.cookie.split('; ').find((part) => part.startsWith('csrf_token='))?.split('=').slice(1).join('=')
 }
