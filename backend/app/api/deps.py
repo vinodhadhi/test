@@ -20,7 +20,7 @@ def current_user(access_token: Annotated[str | None, Cookie()] = None, db: Sessi
         user = db.scalar(select(User).where(User.id == int(payload["sub"])))
     except (ValueError, TypeError, jwt.PyJWTError) as exc:
         raise unauthorized from exc
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or payload.get("auth_version") != user.auth_version:
         raise unauthorized
     return user
 

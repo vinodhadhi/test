@@ -177,6 +177,9 @@ def change_bug_status(bug_id: int, payload: TransitionRequest, actor: User = Dep
     bug = _bug_or_404(db, bug_id, lock=True)
     require_bug_access(db, actor, bug)
     transition_bug(db, bug, actor, payload.to_status, payload.comment)
+    recipient = bug.reported_by if payload.to_status in {BugStatus.IN_PROGRESS, BugStatus.FIXED} else bug.assigned_to
+    if recipient != actor.id:
+        db.add(Notification(user_id=recipient, kind="bug_status", title=f"Bug {payload.to_status.value.lower()}", message=f"{actor.full_name} moved {bug.project.name} #{bug.bug_no} to {payload.to_status.value}: {bug.title}"[:500], link=f"/bugs/{bug.id}"))
     db.commit()
     result = _bug_out(db, _bug_or_404(db, bug.id), include_thread=True)
     hub.publish_from_rest(bug.id, {"type": "bug_updated"})
@@ -196,6 +199,8 @@ def add_comment(bug_id: int, payload: CommentCreate, actor: User = Depends(curre
         raise HTTPException(status_code=403, detail="Managers have read-only access")
     comment = BugComment(bug_id=bug.id, user_id=actor.id, body=payload.body)
     db.add(comment)
+    for recipient in {bug.reported_by, bug.assigned_to} - {actor.id}:
+        db.add(Notification(user_id=recipient, kind="bug_comment", title="New issue comment", message=f"{actor.full_name} commented on {bug.project.name} #{bug.bug_no}: {bug.title}"[:500], link=f"/bugs/{bug.id}"))
     db.commit()
     db.refresh(comment)
     result = CommentOut(id=comment.id, bug_id=comment.bug_id, user_id=comment.user_id, body=comment.body, created_at=comment.created_at, user_name=actor.full_name)

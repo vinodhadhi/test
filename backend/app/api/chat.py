@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 import jwt
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -29,6 +30,10 @@ class ChatHub:
             if peer is exclude:
                 continue
             try:
+                if await asyncio.to_thread(_authorize, bug_id, peer.cookies.get("access_token")) is None:
+                    self.rooms[bug_id].discard(peer)
+                    await peer.close(code=1008)
+                    continue
                 await peer.send_json(event)
             except (RuntimeError, WebSocketDisconnect, OSError):
                 self.rooms[bug_id].discard(peer)
@@ -64,11 +69,11 @@ def _authorize(bug_id: int, token: str | None) -> tuple[int, str, UserRole, int]
         with SessionLocal() as db:
             user = db.scalar(select(User).where(User.id == user_id))
             bug = db.scalar(select(Bug).where(Bug.id == bug_id))
-            if user is None or not user.is_active or bug is None:
+            if user is None or not user.is_active or bug is None or claims.get("auth_version") != user.auth_version:
                 return None
             require_bug_access(db, user, bug)
             return user.id, user.full_name, user.role, int(claims["exp"])
-    except (ValueError, TypeError, jwt.PyJWTError, HTTPException):
+    except (ValueError, TypeError, jwt.PyJWTError, HTTPException, SQLAlchemyError):
         return None
 
 
@@ -92,8 +97,13 @@ async def bug_chat(websocket: WebSocket, bug_id: int) -> None:
                 await websocket.close(code=1008)
                 break
             try:
-                event = await asyncio.wait_for(websocket.receive_json(), timeout=remaining)
+                event = await asyncio.wait_for(websocket.receive_json(), timeout=min(remaining, 30))
             except TimeoutError:
+                if await asyncio.to_thread(_authorize, bug_id, websocket.cookies.get("access_token")) is None:
+                    await websocket.close(code=1008)
+                    break
+                continue
+            if await asyncio.to_thread(_authorize, bug_id, websocket.cookies.get("access_token")) is None:
                 await websocket.close(code=1008)
                 break
             if not isinstance(event, dict) or event.get("type") != "typing" or type(event.get("is_typing")) is not bool:

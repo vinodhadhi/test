@@ -147,6 +147,8 @@ def update_project(project_id: int, payload: ProjectUpdate, _manager: User = Dep
     project = db.get(Project, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    if "name" in payload.model_fields_set and payload.name is None:
+        raise HTTPException(status_code=422, detail="Project name cannot be cleared")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(project, key, value)
     _commit_or_conflict(db, "A project with this name already exists")

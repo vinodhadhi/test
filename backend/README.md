@@ -2,6 +2,8 @@
 
 The API provides cookie-based authentication, administration APIs, the bug workflow, audit history, comments, and private Google Drive attachments.
 
+Run `alembic upgrade head` before starting a new backend version. Session tokens are invalidated when an administrator resets a password or changes a user's role or active state. The auth-version migration requires users with older cookies to sign in again.
+
 ## Local setup
 
 1. Use Python 3.12 and create/activate a virtual environment.
@@ -27,4 +29,4 @@ The manager's Team assignments view uses `GET /manager/team/workload` to show ea
 
 Create or choose a folder inside the team's Shared Drive and set its ID as `DRIVE_SHARED_FOLDER_ID`. Add the service account email from its JSON key as a Shared Drive member with permission to create and read files. Set `GOOGLE_APPLICATION_CREDENTIALS` to the key file path on the backend host; the key itself must not be added to the repository. Files remain private in Drive and are streamed through the API only after bug access is checked.
 
-The API validates file signatures and MIME types, accepts files up to 25 MB, and creates `project-{id}/bug-{number}` folders on first upload. Every new upload requires Drive credentials; if they are missing, the API returns an error instead of silently storing the file locally. The database saves both the Drive file ID and its `drive://` folder/file path. Existing `local:` attachments can still be read and deleted. `RECORDING_RETENTION_DAYS` controls how long voice and video recordings are retained. Schedule `python -m app.services.cleanup_expired_attachments` at the desired interval to apply the retention policy.
+The API validates file signatures and MIME types, accepts files up to 25 MB, and creates `project-{id}/bug-{number}` folders on first upload. Every new upload requires Drive credentials; if they are missing, the API returns an error instead of silently storing the file locally. The database saves both the Drive file ID and its `drive://` folder/file path. Existing `local:` attachments can still be read and deleted. `RECORDING_RETENTION_DAYS` applies only to legacy voice and screen recordings; uploaded workflow videos remain as issue evidence. Schedule `python -m app.services.cleanup_expired_attachments` at the desired interval to apply the retention policy.

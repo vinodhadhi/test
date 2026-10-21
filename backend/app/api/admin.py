@@ -56,6 +56,8 @@ def update_user(user_id: int, payload: UserUpdate, actor: AdminUser, db: Session
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     changes = payload.model_dump(exclude_unset=True)
+    if any(key in changes and changes[key] is None for key in ("user_id", "full_name", "role", "is_active")):
+        raise HTTPException(status_code=422, detail="Required user fields cannot be cleared")
     if user.id == actor.id and (changes.get("role", user.role) != UserRole.ADMIN or changes.get("is_active", user.is_active) is False):
         raise HTTPException(status_code=400, detail="You cannot remove your own administrator access")
     removes_admin = user.role == UserRole.ADMIN and user.is_active and (
@@ -69,8 +71,11 @@ def update_user(user_id: int, payload: UserUpdate, actor: AdminUser, db: Session
         active_bug = db.scalar(select(Bug.id).where(Bug.assigned_to == user.id, Bug.status != BugStatus.VERIFIED).limit(1))
         if active_bug is not None:
             raise HTTPException(status_code=409, detail="Reassign or verify this developer's unresolved bugs before changing their role or deactivating the account")
+    invalidate_sessions = any(key in changes and changes[key] != getattr(user, key) for key in ("role", "is_active"))
     for key, value in changes.items():
         setattr(user, key, value)
+    if invalidate_sessions:
+        user.auth_version += 1
     _save_or_conflict(db, "A user with this user ID already exists")
     db.refresh(user)
     return user
@@ -82,6 +87,7 @@ def reset_password(user_id: int, payload: PasswordReset, db: Session = Depends(g
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     user.password_hash = hash_password(payload.new_password)
+    user.auth_version += 1
     user.failed_login_attempts = 0
     user.locked_until = None
     db.commit()
@@ -107,6 +113,8 @@ def update_project(project_id: int, payload: ProjectUpdate, db: Session = Depend
     project = db.get(Project, project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    if "name" in payload.model_fields_set and payload.name is None:
+        raise HTTPException(status_code=422, detail="Project name cannot be cleared")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(project, key, value)
     _save_or_conflict(db, "A project with this name already exists")

@@ -90,8 +90,9 @@ class DriveService:
         try:
             project_folder = self._get_or_create_folder(f"project-{project_id}", settings.drive_shared_folder_id)
             return self._get_or_create_folder(f"bug-{bug_no}", project_folder)
-        except HttpError as exc:
-            raise DriveStorageError(f"Google Drive could not prepare the project/bug folder (HTTP {exc.resp.status})") from exc
+        except (HttpError, OSError, GoogleAuthError) as exc:
+            detail = f"HTTP {exc.resp.status}" if isinstance(exc, HttpError) else "connection or authentication error"
+            raise DriveStorageError(f"Google Drive could not prepare the project/bug folder ({detail})") from exc
 
     @retry(wait=wait_exponential(multiplier=0.3, min=0.5, max=4), stop=stop_after_attempt(3), retry=retry_if_exception(_retryable), reraise=True)
     def _upload(self, folder_id: str, file_name: str, mime_type: str, content: bytes) -> str:
@@ -114,8 +115,9 @@ class DriveService:
             return DriveUpload(file_id=file_id, path=f"drive://{settings.drive_shared_folder_id}/{project_folder}/{bug_folder}/{file_id}")
         except DriveStorageError:
             raise
-        except HttpError as exc:
-            raise DriveStorageError(f"Google Drive upload failed (HTTP {exc.resp.status})") from exc
+        except (HttpError, OSError, GoogleAuthError) as exc:
+            detail = f"HTTP {exc.resp.status}" if isinstance(exc, HttpError) else "connection or authentication error"
+            raise DriveStorageError(f"Google Drive upload failed ({detail})") from exc
 
     @retry(wait=wait_exponential(multiplier=0.3, min=0.5, max=4), stop=stop_after_attempt(3), retry=retry_if_exception(_retryable), reraise=True)
     def _download(self, file_id: str) -> bytes:
@@ -129,10 +131,11 @@ class DriveService:
                 raise DriveStorageError("Local attachment was not found") from exc
         try:
             return self._download(file_id)
-        except HttpError as exc:
-            if exc.resp.status == 404:
+        except (HttpError, OSError, GoogleAuthError) as exc:
+            if isinstance(exc, HttpError) and exc.resp.status == 404:
                 raise DriveStorageError("Attachment was not found in Google Drive") from exc
-            raise DriveStorageError(f"Google Drive download failed (HTTP {exc.resp.status})") from exc
+            detail = f"HTTP {exc.resp.status}" if isinstance(exc, HttpError) else "connection or authentication error"
+            raise DriveStorageError(f"Google Drive download failed ({detail})") from exc
 
     @retry(wait=wait_exponential(multiplier=0.3, min=0.5, max=4), stop=stop_after_attempt(3), retry=retry_if_exception(_retryable), reraise=True)
     def _delete(self, file_id: str) -> None:
@@ -147,9 +150,11 @@ class DriveService:
             return
         try:
             self._delete(file_id)
-        except HttpError as exc:
-            if exc.resp.status != 404:
-                raise DriveStorageError(f"Google Drive delete failed (HTTP {exc.resp.status})") from exc
+        except (HttpError, OSError, GoogleAuthError) as exc:
+            if isinstance(exc, HttpError) and exc.resp.status == 404:
+                return
+            detail = f"HTTP {exc.resp.status}" if isinstance(exc, HttpError) else "connection or authentication error"
+            raise DriveStorageError(f"Google Drive delete failed ({detail})") from exc
 
 
 drive_service = DriveService()

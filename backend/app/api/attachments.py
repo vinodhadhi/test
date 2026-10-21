@@ -97,7 +97,7 @@ async def upload_attachment(
     except SQLAlchemyError as exc:
         db.rollback()
         try:
-            drive_service.delete(uploaded.file_id)
+            await asyncio.to_thread(drive_service.delete, uploaded.file_id)
         except DriveStorageError:
             pass
         raise HTTPException(status_code=500, detail="Attachment metadata could not be saved") from exc

@@ -24,7 +24,7 @@ def verify_password(password: str, encoded_hash: str) -> bool:
         return False
 
 
-def create_token(*, subject: str, token_type: str, expires_delta: timedelta) -> str:
+def create_token(*, subject: str, token_type: str, expires_delta: timedelta, auth_version: int = 0) -> str:
     now = datetime.now(UTC)
     payload = {
         "sub": subject,
@@ -32,6 +32,7 @@ def create_token(*, subject: str, token_type: str, expires_delta: timedelta) -> 
         "iat": now,
         "exp": now + expires_delta,
         "jti": secrets.token_urlsafe(16),
+        "auth_version": auth_version,
     }
     return jwt.encode(payload, settings.app_secret_key, algorithm=ALGORITHM)
 

@@ -19,6 +19,7 @@ def replace_project_members(db: Session, project: Project, users: list[User]) ->
         raise HTTPException(status_code=409, detail="Reassign or verify the developer's unresolved bugs before removing them from this project")
     now = datetime.now(UTC)
     for user_id in current - requested:
+        db.add(Notification(user_id=user_id, kind="project_removed", title="Project assignment ended", message=f"Your assignment to {project.name} has ended.", link="/my-dashboard"))
         interval = db.scalar(
             select(ProjectAssignmentHistory)
             .where(ProjectAssignmentHistory.project_id == project.id, ProjectAssignmentHistory.user_id == user_id, ProjectAssignmentHistory.removed_at.is_(None))

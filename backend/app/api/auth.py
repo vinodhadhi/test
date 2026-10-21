@@ -23,9 +23,9 @@ REFRESH_COOKIE = "refresh_token"
 CSRF_COOKIE = "csrf_token"
 
 
-def _set_auth_cookies(response: Response, user_id: int) -> None:
-    response.set_cookie(ACCESS_COOKIE, create_token(subject=str(user_id), token_type="access", expires_delta=timedelta(minutes=settings.access_token_minutes)), max_age=settings.access_token_minutes * 60, httponly=True, secure=settings.cookie_secure, samesite="lax", path="/")
-    response.set_cookie(REFRESH_COOKIE, create_token(subject=str(user_id), token_type="refresh", expires_delta=timedelta(days=settings.refresh_token_days)), max_age=settings.refresh_token_days * 86400, httponly=True, secure=settings.cookie_secure, samesite="lax", path="/auth")
+def _set_auth_cookies(response: Response, user: User) -> None:
+    response.set_cookie(ACCESS_COOKIE, create_token(subject=str(user.id), token_type="access", expires_delta=timedelta(minutes=settings.access_token_minutes), auth_version=user.auth_version), max_age=settings.access_token_minutes * 60, httponly=True, secure=settings.cookie_secure, samesite="lax", path="/")
+    response.set_cookie(REFRESH_COOKIE, create_token(subject=str(user.id), token_type="refresh", expires_delta=timedelta(days=settings.refresh_token_days), auth_version=user.auth_version), max_age=settings.refresh_token_days * 86400, httponly=True, secure=settings.cookie_secure, samesite="lax", path="/auth")
     response.set_cookie(CSRF_COOKIE, secrets.token_urlsafe(32), max_age=settings.refresh_token_days * 86400, httponly=False, secure=settings.cookie_secure, samesite="lax", path="/")
 
 
@@ -61,7 +61,7 @@ def login(request: Request, payload: LoginRequest, response: Response, db: Sessi
     user.failed_login_attempts = 0
     user.locked_until = None
     db.commit()
-    _set_auth_cookies(response, user.id)
+    _set_auth_cookies(response, user)
     return user
 
 
@@ -78,9 +78,9 @@ def refresh(
         user = db.scalar(select(User).where(User.id == int(payload["sub"])))
     except (ValueError, TypeError, jwt.PyJWTError) as exc:
         raise HTTPException(status_code=401, detail="Authentication required") from exc
-    if not user or not user.is_active:
+    if not user or not user.is_active or payload.get("auth_version") != user.auth_version:
         raise HTTPException(status_code=401, detail="Authentication required")
-    _set_auth_cookies(response, user.id)
+    _set_auth_cookies(response, user)
     return user
 
 

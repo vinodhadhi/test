@@ -2,7 +2,7 @@
 import logging
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from app.core.config import settings
 from app.core.database import SessionLocal
@@ -13,10 +13,13 @@ logger = logging.getLogger("attachment-retention")
 
 
 def cleanup_expired_attachments() -> int:
-    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=max(1, settings.recording_retention_days))
+    cutoff = datetime.now(UTC) - timedelta(days=max(1, settings.recording_retention_days))
     removed = 0
     with SessionLocal() as db:
-        expired = list(db.scalars(select(Attachment).where(Attachment.kind.in_([AttachmentKind.VOICE, AttachmentKind.VIDEO]), Attachment.created_at < cutoff).order_by(Attachment.id)))
+        expired = list(db.scalars(select(Attachment).where(
+            or_(Attachment.kind == AttachmentKind.VOICE, and_(Attachment.kind == AttachmentKind.VIDEO, Attachment.duration_seconds.is_not(None))),
+            Attachment.created_at < cutoff,
+        ).order_by(Attachment.id)))
         for item in expired:
             try:
                 drive_service.delete(item.drive_file_id)
