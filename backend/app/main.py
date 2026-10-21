@@ -11,6 +11,7 @@ from app.api.bugs import router as bugs_router
 from app.api.chat import router as chat_router
 from app.api.dashboard import router as dashboard_router
 from app.api.manager_projects import router as manager_projects_router
+from app.api.notifications import router as notifications_router
 from app.api.project_work import router as project_work_router
 from app.core.config import settings
 
@@ -33,6 +34,7 @@ app.include_router(project_work_router)
 app.include_router(attachments_router)
 app.include_router(dashboard_router)
 app.include_router(manager_projects_router)
+app.include_router(notifications_router)
 
 
 @app.get("/health", tags=["Health"])

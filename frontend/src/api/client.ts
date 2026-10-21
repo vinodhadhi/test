@@ -17,6 +17,8 @@ export type DashboardTester = { user_id: number; full_name: string; raised: numb
 export type DashboardDeveloper = { user_id: number; full_name: string; assigned: number; to_do: number; in_progress: number; done: number }
 export type PersonalDashboard = { role: 'Tester' | 'Developer'; assigned_projects: number; total: number; open: number; reopened: number; in_progress: number; fixed: number; verified: number; recent: { id: number; bug_no: number; project_id: number; project_name: string; title: string; status: BugStatus; severity: BugSeverity; updated_at: string }[] }
 export type TeamWorkload = { user_id: number; full_name: string; role: 'Tester' | 'Developer'; current_projects: { id: number; name: string }[]; past_projects: { id: number; name: string }[]; other_project_work: { id: number; name: string }[]; active_issues: number; to_retest: number; total_issues: number }
+export type Notification = { id: number; kind: string; title: string; message: string; link: string; created_at: string; read_at: string | null }
+export type NotificationPage = { items: Notification[]; unread_count: number }
 
 // Empty VITE_API_URL uses the current origin; the production web server proxies
 // API paths to the backend, which also works when accessed from another device.
@@ -60,6 +62,9 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const endpoints = {
   me: () => api<User>('/auth/me'),
+  notifications: () => api<NotificationPage>('/notifications'),
+  markNotificationRead: (id: number) => api<Notification>(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllNotificationsRead: () => api<{ updated: number }>('/notifications/read-all', { method: 'POST' }),
   login: (user_id: string, password: string) => api<User>('/auth/login', { method: 'POST', body: JSON.stringify({ user_id, password }) }),
   logout: () => api<void>('/auth/logout', { method: 'POST' }),
   users: () => api<User[]>('/users'),

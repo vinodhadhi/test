@@ -9,6 +9,7 @@ from app.api.deps import current_user, get_db, require_csrf
 from app.api.chat import hub
 from app.models.bug import Bug, BugComment, BugHistory, BugSeverity, BugStatus
 from app.models.project import Module, Project, ProjectMember
+from app.models.notification import Notification
 from app.models.user import User, UserRole
 from app.schemas.bugs import (
     AttachmentOut,
@@ -83,6 +84,8 @@ def create_bug(payload: BugCreate, actor: User = Depends(current_user), db: Sess
     next_no = (db.scalar(select(func.max(Bug.bug_no)).where(Bug.project_id == project.id)) or 0) + 1
     bug = Bug(**payload.model_dump(), bug_no=next_no, reported_by=actor.id, status=BugStatus.OPEN)
     db.add(bug)
+    db.flush()
+    db.add(Notification(user_id=payload.assigned_to, kind="bug_assigned", title="New bug assigned", message=f"{actor.full_name} reported {project.name} #{next_no}: {bug.title}"[:500], link=f"/bugs/{bug.id}"))
     try:
         db.commit()
     except IntegrityError as exc:
@@ -158,8 +161,11 @@ def patch_bug(bug_id: int, payload: BugPatch, actor: User = Depends(current_user
         module_id = changes.get("module_id", bug.module_id)
         assigned_to = changes.get("assigned_to", bug.assigned_to)
         _validate_project_assignment(db, bug.project_id, module_id, assigned_to)
+    previous_assignee = bug.assigned_to
     for key, value in changes.items():
         setattr(bug, key, value)
+    if bug.assigned_to != previous_assignee:
+        db.add(Notification(user_id=bug.assigned_to, kind="bug_assigned", title="Bug assigned to you", message=f"{actor.full_name} assigned you {bug.project.name} #{bug.bug_no}: {bug.title}"[:500], link=f"/bugs/{bug.id}"))
     db.commit()
     result = _bug_out(db, _bug_or_404(db, bug.id))
     hub.publish_from_rest(bug.id, {"type": "bug_updated"})

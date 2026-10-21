@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.project import Project, ProjectAssignmentHistory, ProjectMember
+from app.models.notification import Notification
 from app.models.bug import Bug, BugStatus
 from app.models.user import User, UserRole
 
@@ -28,5 +29,6 @@ def replace_project_members(db: Session, project: Project, users: list[User]) ->
             interval.removed_at = now
     for user_id in requested - current:
         db.add(ProjectAssignmentHistory(project_id=project.id, user_id=user_id, assigned_at=now))
+        db.add(Notification(user_id=user_id, kind="project_assigned", title="Assigned to a project", message=f"You were assigned to {project.name}.", link="/my-dashboard"))
     project.members[:] = [member for member in project.members if member.user_id in requested]
     project.members.extend(ProjectMember(user=user) for user in users if user.id not in current)
