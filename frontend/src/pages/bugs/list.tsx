@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { AlertCircle, ArrowUpRight, Bug as BugIcon, CircleCheck, Clock3, Plus, Search } from 'lucide-react'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { endpoints, type BugSeverity } from '../../api/client'
 import { Button, Card, PageHeader, Select } from '../../components/ui'
@@ -15,6 +15,7 @@ export function BugListPage() {
   const managerProjects = useQuery({ queryKey: ['manager-projects'], queryFn: endpoints.managerProjects, enabled: me.data?.role === 'Manager' })
   const [searchParams, setSearchParams] = useSearchParams()
   const search = searchParams.get('search') ?? ''
+  const [draftSearch, setDraftSearch] = useState(search)
   const page = Math.max(1, Number(searchParams.get('page') ?? 1) || 1)
   const project = searchParams.get('project') ?? ''
   const status = searchParams.get('status') ?? ''
@@ -38,6 +39,18 @@ export function BugListPage() {
     next.delete('page')
     setSearchParams(next)
   }
+  useEffect(() => { setDraftSearch(search) }, [search])
+  useEffect(() => {
+    if (draftSearch.trim() === search) return
+    const timeout = window.setTimeout(() => {
+      const next = new URLSearchParams(searchParams)
+      if (draftSearch.trim()) next.set('search', draftSearch.trim())
+      else next.delete('search')
+      next.delete('page')
+      setSearchParams(next, { replace: true })
+    }, 350)
+    return () => window.clearTimeout(timeout)
+  }, [draftSearch, search, searchParams, setSearchParams])
   const goToPage = (target: number) => {
     const next = new URLSearchParams(searchParams)
     if (target > 1) next.set('page', String(target))
@@ -61,9 +74,10 @@ export function BugListPage() {
     <Card className="table-card bug-list-card">
       <div className="bug-toolbar">
         <div className="bug-toolbar-title"><div><h3>Issues</h3><p>{bugs.data?.total ?? 0} total · page {page} of {pageCount}</p></div>{role === 'Tester' && <div className="queue-tabs"><Link className={testerScope === 'mine' && !status ? 'selected' : ''} to="/bugs">My reports</Link><Link className={testerScope === 'mine' && status === 'Fixed' ? 'selected' : ''} to="/bugs?status=Fixed">Retest queue</Link><Link className={testerScope === 'project' ? 'selected' : ''} to="/bugs?scope=project">Project issues</Link></div>}</div>
-        <div className="bug-filters"><label className="search-box"><Search size={15} /><input value={search} onChange={(event) => setFilter('search', event.target.value)} placeholder="Search issue title…" /></label><Select value={project} onChange={(event) => setFilter('project', event.target.value)} aria-label="Filter by project"><option value="">All projects</option>{projectOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><Select value={status} onChange={(event) => setFilter('status', event.target.value)} aria-label="Filter by status"><option value="">All statuses</option>{statuses.map((item) => <option key={item}>{item}</option>)}</Select><Select value={severity} onChange={(event) => setFilter('severity', event.target.value)} aria-label="Filter by severity"><option value="">All severity</option>{['Critical', 'High', 'Medium', 'Low'].map((item) => <option key={item}>{item}</option>)}</Select></div>
+        <div className="bug-filters"><label className="search-box"><Search size={15} /><input value={draftSearch} onChange={(event) => setDraftSearch(event.target.value)} aria-label="Search issues" placeholder="Search issue title…" /></label><Select value={project} onChange={(event) => setFilter('project', event.target.value)} aria-label="Filter by project"><option value="">All projects</option>{projectOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><Select value={status} onChange={(event) => setFilter('status', event.target.value)} aria-label="Filter by status"><option value="">All statuses</option>{statuses.map((item) => <option key={item}>{item}</option>)}</Select><Select value={severity} onChange={(event) => setFilter('severity', event.target.value)} aria-label="Filter by severity"><option value="">All severity</option>{['Critical', 'High', 'Medium', 'Low'].map((item) => <option key={item}>{item}</option>)}</Select></div>
       </div>
-      {bugs.isPending ? <div className="loading-row">Loading issues…</div> : bugs.isError ? <div className="empty-state"><BugIcon /><b>Could not load issues</b><span>{bugs.error.message}</span><Button variant="secondary" onClick={() => bugs.refetch()}>Try again</Button></div> : items.length === 0 ? <div className="empty-state"><BugIcon /><b>{search || status || severity ? 'No issues match these filters' : 'No issues yet'}</b><span>{canReport ? 'Report an issue to start the QA workflow.' : 'Issues assigned to you will appear here.'}</span>{canReport && <Link className="button button-secondary" to="/bugs/new"><Plus size={15} /> Report first bug</Link>}</div> : <div className="table-scroll"><table className="bug-table"><thead><tr><th>ISSUE</th><th>PROJECT / MODULE</th><th>SEVERITY</th><th>STATUS</th><th>ASSIGNEE</th><th>REPORTED</th><th></th></tr></thead><tbody>{items.map((bug) => <tr key={bug.id}><td><Link to={`/bugs/${bug.id}`} className="bug-title-link"><b>#{bug.bug_no} · {bug.title}</b><small>{bug.type} · {bug.attachments.length} attachment{bug.attachments.length === 1 ? '' : 's'}</small></Link></td><td><span className="project-module-cell">{bug.project_name}<small>{bug.module_name}</small></span></td><td><span className={`severity severity-${bug.severity.toLowerCase()}`}><i />{bug.severity}</span></td><td><span className={`status-pill status-${bug.status.toLowerCase().replace(' ', '-')}`}>{bug.status}</span></td><td>{bug.assignee_name}</td><td className="date-cell">{new Date(bug.created_at).toLocaleDateString()}</td><td><Link className="table-arrow" to={`/bugs/${bug.id}`} aria-label={`Open bug ${bug.bug_no}`}><ArrowUpRight size={16} /></Link></td></tr>)}</tbody></table></div>}
+      {(search || project || status || severity) && <div className="filter-reset"><Button variant="ghost" onClick={() => { setDraftSearch(''); setSearchParams(new URLSearchParams()) }}>Clear filters</Button></div>}
+      {bugs.isPending ? <div className="loading-row">Loading issues…</div> : bugs.isError ? <div className="empty-state"><BugIcon /><b>Could not load issues</b><span>{bugs.error.message}</span><Button variant="secondary" onClick={() => bugs.refetch()}>Try again</Button></div> : items.length === 0 ? <div className="empty-state"><BugIcon /><b>{search || project || status || severity ? 'No issues match these filters' : 'No issues yet'}</b><span>{canReport ? 'Report an issue to start the QA workflow.' : 'Issues assigned to you will appear here.'}</span>{canReport && <Link className="button button-secondary" to="/bugs/new"><Plus size={15} /> Report first bug</Link>}</div> : <div className="table-scroll"><table className="bug-table"><thead><tr><th>ISSUE</th><th>PROJECT / MODULE</th><th>SEVERITY</th><th>STATUS</th><th>ASSIGNEE</th><th>REPORTED</th><th></th></tr></thead><tbody>{items.map((bug) => <tr key={bug.id}><td><Link to={`/bugs/${bug.id}`} className="bug-title-link"><b>#{bug.bug_no} · {bug.title}</b><small>{bug.type} · {bug.attachments.length} attachment{bug.attachments.length === 1 ? '' : 's'}</small></Link></td><td><span className="project-module-cell">{bug.project_name}<small>{bug.module_name}</small></span></td><td><span className={`severity severity-${bug.severity.toLowerCase()}`}><i />{bug.severity}</span></td><td><span className={`status-pill status-${bug.status.toLowerCase().replace(' ', '-')}`}>{bug.status}</span></td><td>{bug.assignee_name}</td><td className="date-cell">{new Date(bug.created_at).toLocaleDateString()}</td><td><Link className="table-arrow" to={`/bugs/${bug.id}`} aria-label={`Open bug ${bug.bug_no}`}><ArrowUpRight size={16} /></Link></td></tr>)}</tbody></table></div>}
       {!!bugs.data?.total && <div className="table-foot bug-pagination"><span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, bugs.data.total)} of {bugs.data.total}</span><div><Button variant="secondary" onClick={() => goToPage(page - 1)} disabled={page <= 1 || bugs.isFetching}>Previous</Button><Button variant="secondary" onClick={() => goToPage(page + 1)} disabled={page >= pageCount || bugs.isFetching}>Next</Button></div></div>}
     </Card>
   </>
