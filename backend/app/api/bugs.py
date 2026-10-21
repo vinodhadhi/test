@@ -111,9 +111,10 @@ def list_bugs(
         base = base.where(Bug.assigned_to == actor.id)
     elif actor.role == UserRole.TESTER:
         member_projects = select(ProjectMember.project_id).where(ProjectMember.user_id == actor.id)
-        base = base.where(Bug.project_id.in_(member_projects))
         if scope == "mine":
             base = base.where(Bug.reported_by == actor.id)
+        else:
+            base = base.where(or_(Bug.project_id.in_(member_projects), Bug.reported_by == actor.id))
     if project is not None:
         base = base.where(Bug.project_id == project)
     if module is not None:
@@ -153,13 +154,16 @@ def patch_bug(bug_id: int, payload: BugPatch, actor: User = Depends(current_user
     required_values = {"module_id", "title", "steps", "expected_result", "actual_result", "severity", "priority", "type", "assigned_to"}
     if any(key in changes and changes[key] is None for key in required_values):
         raise HTTPException(status_code=422, detail="Required bug fields cannot be cleared")
-    module_id = changes.get("module_id", bug.module_id)
-    assigned_to = changes.get("assigned_to", bug.assigned_to)
-    _validate_project_assignment(db, bug.project_id, module_id, assigned_to)
+    if "module_id" in changes or "assigned_to" in changes:
+        module_id = changes.get("module_id", bug.module_id)
+        assigned_to = changes.get("assigned_to", bug.assigned_to)
+        _validate_project_assignment(db, bug.project_id, module_id, assigned_to)
     for key, value in changes.items():
         setattr(bug, key, value)
     db.commit()
-    return _bug_out(db, _bug_or_404(db, bug.id))
+    result = _bug_out(db, _bug_or_404(db, bug.id))
+    hub.publish_from_rest(bug.id, {"type": "bug_updated"})
+    return result
 
 
 @router.post("/{bug_id}/transition", response_model=BugOut, dependencies=[Depends(require_csrf)])
@@ -168,7 +172,14 @@ def change_bug_status(bug_id: int, payload: TransitionRequest, actor: User = Dep
     require_bug_access(db, actor, bug)
     transition_bug(db, bug, actor, payload.to_status, payload.comment)
     db.commit()
-    return _bug_out(db, _bug_or_404(db, bug.id), include_thread=True)
+    result = _bug_out(db, _bug_or_404(db, bug.id), include_thread=True)
+    hub.publish_from_rest(bug.id, {"type": "bug_updated"})
+    if payload.comment and payload.to_status in {BugStatus.VERIFIED, BugStatus.REOPENED}:
+        for comment in reversed(result.comments):
+            if comment.user_id == actor.id and comment.body == payload.comment.strip():
+                hub.publish_from_rest(bug.id, {"type": "comment", "comment": comment.model_dump(mode="json")})
+                break
+    return result
 
 
 @router.post("/{bug_id}/comments", response_model=CommentOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_csrf)])

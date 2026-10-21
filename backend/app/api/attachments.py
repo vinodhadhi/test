@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 from urllib.parse import quote
 
@@ -82,7 +83,7 @@ async def upload_attachment(
     if mime.startswith("image/"):
         mime = filetype.guess_mime(content) or mime
     try:
-        uploaded = drive_service.upload(project_id=bug.project_id, bug_no=bug.bug_no, file_name=safe_name, mime_type=mime, content=content)
+        uploaded = await asyncio.to_thread(drive_service.upload, project_id=bug.project_id, bug_no=bug.bug_no, file_name=safe_name, mime_type=mime, content=content)
     except DriveStorageError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     attachment = Attachment(

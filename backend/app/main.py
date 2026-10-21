@@ -19,8 +19,8 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
-    # Temporary development setting: allow every origin while retaining cookie auth.
-    allow_origins=["*"],
+    # Development may use LAN origins; production accepts only the configured web app.
+    allow_origins=[settings.frontend_origin] if settings.app_env.lower() == "production" else ["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "X-CSRF-Token"],

@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.api.deps import get_db, require_admin, require_csrf
 from app.core.security import hash_password
 from app.models.project import Module, Project, ProjectMember
+from app.models.bug import Bug, BugStatus
 from app.models.user import User, UserRole
 from app.services.project_assignments import replace_project_members as update_project_membership
 from app.schemas.admin import (
@@ -64,6 +65,10 @@ def update_user(user_id: int, payload: UserUpdate, actor: AdminUser, db: Session
         other_admins = db.scalar(select(User.id).where(User.role == UserRole.ADMIN, User.is_active.is_(True), User.id != user.id).limit(1))
         if other_admins is None:
             raise HTTPException(status_code=400, detail="At least one active administrator must remain")
+    if user.role == UserRole.DEVELOPER and (changes.get("role", user.role) != UserRole.DEVELOPER or changes.get("is_active", user.is_active) is False):
+        active_bug = db.scalar(select(Bug.id).where(Bug.assigned_to == user.id, Bug.status != BugStatus.VERIFIED).limit(1))
+        if active_bug is not None:
+            raise HTTPException(status_code=409, detail="Reassign or verify this developer's unresolved bugs before changing their role or deactivating the account")
     for key, value in changes.items():
         setattr(user, key, value)
     _save_or_conflict(db, "A user with this user ID already exists")
@@ -149,7 +154,7 @@ def delete_module(project_id: int, module_id: int, db: Session = Depends(get_db)
 
 @router.put("/projects/{project_id}/members", response_model=list[UserOut])
 def replace_project_members(project_id: int, payload: ProjectMembersUpdate, db: Session = Depends(get_db)) -> list[User]:
-    project = db.scalar(select(Project).options(selectinload(Project.members)).where(Project.id == project_id))
+    project = db.scalar(select(Project).options(selectinload(Project.members)).where(Project.id == project_id).with_for_update())
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     user_ids = set(payload.user_ids)

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { chatSocketUrl, type Bug, type BugComment } from '../../api/client'
+import { chatSocketUrl, endpoints, type Bug, type BugComment } from '../../api/client'
 
 type ChatEvent =
   | { type: 'comment'; comment: BugComment }
   | { type: 'typing'; user_id: number; user_name: string; is_typing: boolean }
+  | { type: 'bug_updated' }
 
 export function useBugChat(bugId: number, userId?: number) {
   const client = useQueryClient()
@@ -33,6 +34,10 @@ export function useBugChat(bugId: number, userId?: number) {
           client.setQueryData<Bug>(['bug', bugId], (current) => current && !current.comments.some((entry) => entry.id === event.comment.id)
             ? { ...current, comments: [...current.comments, event.comment] } : current)
           setTyping((current) => { const next = { ...current }; delete next[event.comment.user_id]; return next })
+        } else if (event.type === 'bug_updated') {
+          client.invalidateQueries({ queryKey: ['bug', bugId] })
+          client.invalidateQueries({ queryKey: ['bugs'] })
+          client.invalidateQueries({ queryKey: ['dashboard'] })
         } else if (event.type === 'typing' && event.user_id !== userId) {
           setTyping((current) => {
             const next = { ...current }
@@ -46,7 +51,12 @@ export function useBugChat(bugId: number, userId?: number) {
         if (socket.current === ws) socket.current = null
         setConnected(false)
         setTyping({})
-        if (!stopped) retry = setTimeout(connect, Math.min(1000 * 2 ** attempts++, 10000))
+        if (!stopped) retry = setTimeout(async () => {
+          // WebSocket handshakes cannot use the REST client's 401 refresh path.
+          // Refresh the short-lived access cookie before the next handshake.
+          try { await endpoints.me() } catch { /* A later attempt can succeed after login. */ }
+          if (!stopped) connect()
+        }, Math.min(1000 * 2 ** attempts++, 10000))
       }
     }
     connect()

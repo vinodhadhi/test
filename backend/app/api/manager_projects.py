@@ -198,7 +198,7 @@ def list_members(project_id: int, _manager: User = Depends(_manager), db: Sessio
 
 @router.put("/projects/{project_id}/members", response_model=list[UserOut], dependencies=[Depends(require_csrf)])
 def replace_members(project_id: int, payload: ProjectMembersUpdate, _manager: User = Depends(_manager), db: Session = Depends(get_db)) -> list[User]:
-    project = db.scalar(select(Project).options(selectinload(Project.members)).where(Project.id == project_id))
+    project = db.scalar(select(Project).options(selectinload(Project.members)).where(Project.id == project_id).with_for_update())
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     user_ids = set(payload.user_ids)

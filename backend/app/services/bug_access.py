@@ -12,6 +12,8 @@ def can_view_bug(db: Session, user: User, bug: Bug) -> bool:
         return True
     if user.role == UserRole.DEVELOPER:
         return bug.assigned_to == user.id
+    if user.role == UserRole.TESTER and bug.reported_by == user.id:
+        return True
     return db.scalar(select(exists().where(ProjectMember.project_id == bug.project_id, ProjectMember.user_id == user.id))) is True
 
 

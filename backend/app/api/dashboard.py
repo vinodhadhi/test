@@ -18,9 +18,6 @@ def personal_dashboard(user: User = Depends(current_user), db: Session = Depends
 
     user_column = Bug.reported_by if user.role == UserRole.TESTER else Bug.assigned_to
     filters = [user_column == user.id]
-    if user.role == UserRole.TESTER:
-        assigned_project_ids = select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)
-        filters.append(Bug.project_id.in_(assigned_project_ids))
     counts = dict(db.execute(select(Bug.status, func.count(Bug.id)).where(*filters).group_by(Bug.status)).all())
     recent = db.execute(
         select(Bug.id, Bug.bug_no, Bug.project_id, Project.name.label("project_name"), Bug.title, Bug.status, Bug.severity, Bug.updated_at)

@@ -1,16 +1,21 @@
 from datetime import UTC, datetime
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.project import Project, ProjectAssignmentHistory, ProjectMember
-from app.models.user import User
+from app.models.bug import Bug, BugStatus
+from app.models.user import User, UserRole
 
 
 def replace_project_members(db: Session, project: Project, users: list[User]) -> None:
     """Change membership and assignment history in the same transaction."""
     current = {member.user_id for member in project.members}
     requested = {user.id for user in users}
+    removed_developers = set(db.scalars(select(User.id).where(User.id.in_(current - requested), User.role == UserRole.DEVELOPER)))
+    if removed_developers and db.scalar(select(Bug.id).where(Bug.project_id == project.id, Bug.assigned_to.in_(removed_developers), Bug.status != BugStatus.VERIFIED).limit(1)) is not None:
+        raise HTTPException(status_code=409, detail="Reassign or verify the developer's unresolved bugs before removing them from this project")
     now = datetime.now(UTC)
     for user_id in current - requested:
         interval = db.scalar(

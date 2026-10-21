@@ -19,6 +19,8 @@ Login accepts a user ID and password. Password hashes use Argon2id. Access and r
 
 All bug reads and writes check the authenticated role and record ownership or project membership in the service layer. Each status transition and its associated history row are committed together. Managers can view dashboards and manage projects, modules, Tester/Developer accounts, and project assignments. Admins retain full user administration, including editing, deactivation, and password resets.
 
+Testers retain access to bugs they reported after leaving a project, so they can complete retests. Unresolved bugs must be reassigned or verified before an assigned developer is removed from a project or deactivated. Production CORS accepts only `FRONTEND_ORIGIN`; development keeps wildcard origins for LAN use.
+
 The manager's Team assignments view uses `GET /manager/team/workload` to show each active tester and developer's current projects, recorded former assignments, earlier project work inferred from bugs, and open issue counts. Assignment history starts with the migration that introduces it; older removed memberships cannot be reconstructed unless those users have issue records in that project.
 
 ## Google Drive Shared Drive
