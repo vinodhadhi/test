@@ -51,6 +51,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(csrf ? { 'X-CSRF-Token': decodeURIComponent(csrf) } : undefined)
     const refreshed = await fetch(`${apiBase}/auth/refresh`, { method: 'POST', headers, credentials: 'include' })
     if (refreshed.ok) response = await send()
+    if (!refreshed.ok || response.status === 401) window.dispatchEvent(new Event('qa-session-expired'))
   }
   if (!response.ok) {
     const body = await response.json().catch(() => null)

@@ -1,6 +1,6 @@
-import { Suspense, lazy } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
+import { Suspense, lazy, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { endpoints } from './api/client'
 import { AdminLayout } from './components/admin-layout'
 import { LoginPage } from './pages/login'
@@ -33,6 +33,13 @@ function HomeRedirect() {
 }
 
 export default function App() {
+  const client = useQueryClient()
+  const navigate = useNavigate()
+  useEffect(() => {
+    const sessionExpired = () => { client.clear(); navigate('/login', { replace: true }) }
+    window.addEventListener('qa-session-expired', sessionExpired)
+    return () => window.removeEventListener('qa-session-expired', sessionExpired)
+  }, [client, navigate])
   return <Routes>
     <Route path="/login" element={<LoginPage />} />
     <Route element={<RoleGuard roles={['Manager']} />}>

@@ -64,7 +64,14 @@ export function BugDetailPage() {
   const refreshBug = () => { client.invalidateQueries({ queryKey: ['bug', bugId] }); client.invalidateQueries({ queryKey: ['bugs'] }); client.invalidateQueries({ queryKey: ['dashboard'] }) }
   const transition = useMutation({ mutationFn: (target: BugStatus) => endpoints.transitionBug(bugId, target, transitionComment.trim() || undefined), onSuccess: () => { setActionError(''); setTransitionComment(''); refreshBug() }, onError: (error: Error) => setActionError(error.message) })
   const addComment = useMutation({ mutationFn: () => endpoints.addComment(bugId, comment.trim()), onSuccess: () => { setComment(''); stopTyping(); setActionError(''); refreshBug() }, onError: (error: Error) => setActionError(error.message) })
-  const upload = useMutation({ mutationFn: async (files: FileList) => { for (const file of Array.from(files)) await endpoints.uploadAttachment(bugId, file); return true }, onSuccess: refreshBug, onError: (error: Error) => setActionError(error.message) })
+  const upload = useMutation({ mutationFn: async (files: FileList) => {
+    const failed: { name: string; reason: string }[] = []
+    for (const file of Array.from(files)) {
+      try { await endpoints.uploadAttachment(bugId, file) }
+      catch (error) { failed.push({ name: file.name, reason: error instanceof Error ? error.message : 'Upload failed' }) }
+    }
+    return failed
+  }, onSuccess: (failed) => { refreshBug(); setActionError(failed.length ? `${failed.length} attachment${failed.length === 1 ? '' : 's'} could not be uploaded (${failed.map((file) => file.name).join(', ')}): ${failed[0].reason}` : '') }, onError: (error: Error) => setActionError(error.message) })
   const saveEdit = useMutation({ mutationFn: (values: BugEdit) => endpoints.updateBug(bugId, values), onSuccess: () => { setEditing(false); setEditValues(null); setActionError(''); refreshBug() }, onError: (error: Error) => setActionError(error.message) })
 
   if (!Number.isInteger(bugId) || bugId < 1) return <Card className="empty-state"><b>Invalid issue link</b><span>Choose an issue from the list to continue.</span><Link className="button button-secondary" to="/bugs"><ArrowLeft size={15} /> Back to issues</Link></Card>

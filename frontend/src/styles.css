@@ -108,3 +108,17 @@ tbody tr:hover{background:var(--soft)}
 @media(max-width:720px){.topbar{position:sticky}.breadcrumb{display:none}.top-actions{width:100%;justify-content:flex-end}.content{padding:24px 16px 48px}.page-header{flex-wrap:wrap}.page-header>.button{margin-left:0}.bug-toolbar-title{flex-wrap:wrap}.queue-tabs{max-width:100%;overflow-x:auto}.bug-filters .search-box{flex-basis:100%;width:100%}.bug-filters .input{min-width:125px}.notification-panel{right:-50px}}
 @media(max-width:480px){.metric-grid,.dashboard-personal-page .metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.metric-card{min-width:0}.profile{border-left:0;padding-left:0}.profile .avatar{width:30px;height:30px}.notification-panel{right:-94px}.report-submit>span{line-height:1.5}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
+.assignment-summary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--border);background:var(--soft)}
+.assignment-summary span{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--panel);font-size:11px;color:var(--muted)}
+.assignment-summary b{font-size:13px;color:var(--text)}
+.assignment-summary .assignment-draft{margin-left:auto;background:#fff7e7;border-color:#e9d6ae;color:#875e20;font-weight:700}
+.assignment-summary .assignment-saved{margin-left:auto;background:#ecf8f0;border-color:#cde6d6;color:#276e49;font-weight:700}
+.dark .assignment-summary .assignment-draft{background:#413320;color:#f1ca8d;border-color:#6c5431}
+.dark .assignment-summary .assignment-saved{background:#203b2d;color:#a1d6b4;border-color:#39664a}
+.assignment-filters{display:flex;gap:10px;align-items:center;padding:0 20px 16px}
+.assignment-filters .search-box{height:38px;flex:1;max-width:350px}
+.assignment-filters .input{width:160px;height:38px}
+.assignment-actions{padding:17px 20px;border-top:1px solid var(--border);gap:10px}
+.assignment-empty{display:grid;justify-items:center;gap:10px;margin:0;padding:28px 20px;text-align:center;color:var(--muted);font-size:12px}
+@media(max-width:560px){.assignment-summary .assignment-draft,.assignment-summary .assignment-saved{margin-left:0}.assignment-filters{flex-wrap:wrap}.assignment-filters .search-box,.assignment-filters .input{width:100%;max-width:none;flex-basis:100%}.assignment-actions .button{flex:1}}
