@@ -83,10 +83,10 @@ def create_bug(payload: BugCreate, actor: User = Depends(current_user), db: Sess
     _validate_project_assignment(db, project.id, payload.module_id, payload.assigned_to)
     next_no = (db.scalar(select(func.max(Bug.bug_no)).where(Bug.project_id == project.id)) or 0) + 1
     bug = Bug(**payload.model_dump(), bug_no=next_no, reported_by=actor.id, status=BugStatus.OPEN)
-    db.add(bug)
-    db.flush()
-    db.add(Notification(user_id=payload.assigned_to, kind="bug_assigned", title="New bug assigned", message=f"{actor.full_name} reported {project.name} #{next_no}: {bug.title}"[:500], link=f"/bugs/{bug.id}"))
     try:
+        db.add(bug)
+        db.flush()
+        db.add(Notification(user_id=payload.assigned_to, kind="bug_assigned", title="New bug assigned", message=f"{actor.full_name} reported {project.name} #{next_no}: {bug.title}"[:500], link=f"/bugs/{bug.id}"))
         db.commit()
     except IntegrityError as exc:
         db.rollback()

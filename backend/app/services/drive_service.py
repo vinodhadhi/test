@@ -4,10 +4,14 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 import re
+from threading import RLock
+from uuid import uuid4
 from typing import Any
 
 from google.auth.exceptions import GoogleAuthError
+from google.auth.transport.requests import Request
 from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaIoBaseUpload
@@ -38,6 +42,7 @@ class DriveService:
 
     def __init__(self, client: Any | None = None) -> None:
         self._client = client
+        self._lock = RLock()
 
     @property
     def local_root(self) -> Path:
@@ -52,16 +57,24 @@ class DriveService:
     @property
     def client(self) -> Any:
         if self._client is None:
+            token_path = Path(settings.google_drive_oauth_token_file)
             credentials_path = settings.google_application_credentials
-            if not credentials_path:
-                raise DriveStorageError("Set GOOGLE_APPLICATION_CREDENTIALS to the service account JSON path")
             if not settings.drive_shared_folder_id:
-                raise DriveStorageError("Set DRIVE_SHARED_FOLDER_ID to the Shared Drive upload folder")
+                raise DriveStorageError("Set DRIVE_SHARED_FOLDER_ID to the Google Drive upload folder")
             try:
-                credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=[DRIVE_SCOPE])
+                if token_path.is_file():
+                    credentials = Credentials.from_authorized_user_file(str(token_path), scopes=[DRIVE_SCOPE])
+                    if not credentials.valid:
+                        if not credentials.refresh_token:
+                            raise DriveStorageError("Google Drive authorization expired; authorize the account again")
+                        credentials.refresh(Request())
+                elif credentials_path and Path(credentials_path).is_file():
+                    credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=[DRIVE_SCOPE])
+                else:
+                    raise DriveStorageError("Google Drive credentials are not available on the backend host")
                 self._client = build("drive", "v3", credentials=credentials, cache_discovery=False)
             except (OSError, ValueError, GoogleAuthError) as exc:
-                raise DriveStorageError("Could not load Google Drive service account credentials") from exc
+                raise DriveStorageError("Could not load or refresh Google Drive credentials") from exc
         return self._client
 
     @retry(wait=wait_exponential(multiplier=0.3, min=0.5, max=4), stop=stop_after_attempt(3), retry=retry_if_exception(_retryable), reraise=True)
@@ -69,7 +82,7 @@ class DriveService:
         escaped = name.replace("\\", "\\\\").replace("'", "\\'")
         result = self.client.files().list(
             q=f"name = '{escaped}' and mimeType = '{FOLDER_MIME}' and '{parent_id}' in parents and trashed = false",
-            fields="files(id,name)", pageSize=10, corpora="allDrives", includeItemsFromAllDrives=True, supportsAllDrives=True,
+            fields="files(id,name)", pageSize=10, corpora="user", includeItemsFromAllDrives=True, supportsAllDrives=True,
         ).execute()
         files = result.get("files", [])
         return files[0]["id"] if files else None
@@ -88,8 +101,9 @@ class DriveService:
 
     def bug_folder(self, project_id: int, bug_no: int) -> str:
         try:
-            project_folder = self._get_or_create_folder(f"project-{project_id}", settings.drive_shared_folder_id)
-            return self._get_or_create_folder(f"bug-{bug_no}", project_folder)
+            with self._lock:
+                project_folder = self._get_or_create_folder(f"project-{project_id}", settings.drive_shared_folder_id)
+                return self._get_or_create_folder(f"bug-{bug_no}", project_folder)
         except (HttpError, OSError, GoogleAuthError) as exc:
             detail = f"HTTP {exc.resp.status}" if isinstance(exc, HttpError) else "connection or authentication error"
             raise DriveStorageError(f"Google Drive could not prepare the project/bug folder ({detail})") from exc
@@ -104,14 +118,23 @@ class DriveService:
         return result["id"]
 
     def upload(self, *, project_id: int, bug_no: int, file_name: str, mime_type: str, content: bytes) -> DriveUpload:
-        if self._client is None and (not settings.google_application_credentials or not Path(settings.google_application_credentials).is_file()):
+        if settings.attachment_storage == "local":
+            file_id = f"local:{uuid4().hex}"
+            try:
+                self.local_root.mkdir(parents=True, exist_ok=True)
+                self._local_path(file_id).write_bytes(content)
+            except OSError as exc:
+                raise DriveStorageError("Local attachment could not be saved") from exc
+            return DriveUpload(file_id=file_id, path=f"local://{project_id}/{bug_no}/{file_id.removeprefix('local:')}")
+        if self._client is None and not Path(settings.google_drive_oauth_token_file).is_file() and (not settings.google_application_credentials or not Path(settings.google_application_credentials).is_file()):
             raise DriveStorageError("Google Drive credentials are not available on the backend host")
         if not settings.drive_shared_folder_id:
             raise DriveStorageError("DRIVE_SHARED_FOLDER_ID is not configured")
         try:
-            project_folder = self._get_or_create_folder(f"project-{project_id}", settings.drive_shared_folder_id)
-            bug_folder = self._get_or_create_folder(f"bug-{bug_no}", project_folder)
-            file_id = self._upload(bug_folder, file_name, mime_type, content)
+            with self._lock:
+                project_folder = self._get_or_create_folder(f"project-{project_id}", settings.drive_shared_folder_id)
+                bug_folder = self._get_or_create_folder(f"bug-{bug_no}", project_folder)
+                file_id = self._upload(bug_folder, file_name, mime_type, content)
             return DriveUpload(file_id=file_id, path=f"drive://{settings.drive_shared_folder_id}/{project_folder}/{bug_folder}/{file_id}")
         except DriveStorageError:
             raise
@@ -130,7 +153,8 @@ class DriveService:
             except OSError as exc:
                 raise DriveStorageError("Local attachment was not found") from exc
         try:
-            return self._download(file_id)
+            with self._lock:
+                return self._download(file_id)
         except (HttpError, OSError, GoogleAuthError) as exc:
             if isinstance(exc, HttpError) and exc.resp.status == 404:
                 raise DriveStorageError("Attachment was not found in Google Drive") from exc
@@ -149,7 +173,8 @@ class DriveService:
                 raise DriveStorageError("Could not delete the local development attachment") from exc
             return
         try:
-            self._delete(file_id)
+            with self._lock:
+                self._delete(file_id)
         except (HttpError, OSError, GoogleAuthError) as exc:
             if isinstance(exc, HttpError) and exc.resp.status == 404:
                 return

@@ -37,13 +37,18 @@ export function ReportBugPage() {
   const developers = useQuery({ queryKey: ['project-developers', selectedProjectId], queryFn: () => endpoints.projectDevelopers(selectedProjectId), enabled: selectedProjectId > 0 })
   const projectField = register('project_id', { setValueAs: (value) => Number(value) || 0 })
   const mutation = useMutation({ mutationFn: async (values: Values) => {
+    const selectedFiles = [...files]
+    if (selectedFiles.length) {
+      const storage = await endpoints.attachmentStorage()
+      if (!storage.configured) throw new Error('Evidence storage is unavailable. Ask an administrator to configure Google Drive before submitting attachments.')
+    }
     const bug = await endpoints.createBug({ ...values, project_id: Number(values.project_id), module_id: Number(values.module_id), assigned_to: Number(values.assigned_to), environment: values.environment || null, build_version: values.build_version || null, reference_url: values.reference_url || null })
     const failedFiles: { name: string; reason: string }[] = []
-    setUploadProgress({ completed: 0, total: files.length })
-    for (const [index, file] of files.entries()) {
+    setUploadProgress({ completed: 0, total: selectedFiles.length })
+    for (const [index, file] of selectedFiles.entries()) {
       try { await endpoints.uploadAttachment(bug.id, file) }
       catch (error) { failedFiles.push({ name: file.name, reason: error instanceof Error ? error.message : 'Upload failed' }) }
-      setUploadProgress({ completed: index + 1, total: files.length })
+      setUploadProgress({ completed: index + 1, total: selectedFiles.length })
     }
     return { bug, failedFiles }
   }, onSuccess: ({ bug, failedFiles }) => { client.invalidateQueries({ queryKey: ['dashboard'] }); client.invalidateQueries({ queryKey: ['bugs'] }); navigate(`/bugs/${bug.id}`, { replace: true, state: { notice: `Bug #${bug.bug_no} was reported.`, warning: failedFiles.length ? `${failedFiles.length} attachment${failedFiles.length === 1 ? '' : 's'} could not be uploaded (${failedFiles.map((file) => file.name).join(', ')}): ${failedFiles[0].reason}. You can retry from this issue page.` : undefined } }) }, onError: (error: Error) => setClientError(error.message) })

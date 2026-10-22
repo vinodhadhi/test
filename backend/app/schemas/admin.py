@@ -1,4 +1,5 @@
-from typing import Annotated
+from datetime import date
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
@@ -55,6 +56,20 @@ class ProjectOut(BaseModel):
     name: str
     description: str | None
     created_by: int
+    lifecycle_stage: str = "Planning"
+    start_date: date | None = None
+    target_date: date | None = None
+    health_note: str | None = None
+
+
+ProjectStage = Literal["Planning", "In progress", "Testing", "Ready for release", "Released", "On hold"]
+
+
+class ProjectLifecycleUpdate(BaseModel):
+    lifecycle_stage: ProjectStage
+    start_date: date | None = None
+    target_date: date | None = None
+    health_note: Annotated[str | None, Field(max_length=2000)] = None
 
 
 class ModuleCreate(BaseModel):

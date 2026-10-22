@@ -21,6 +21,7 @@ dependencies = [
   "slowapi>=0.1.9,<1.0",
   "google-api-python-client>=2.145,<3.0",
   "google-auth>=2.35,<3.0",
+  "google-auth-oauthlib>=1.2,<2.0",
   "tenacity>=9.0,<10.0",
   "python-multipart>=0.0.12,<1.0",
   "filetype>=1.2,<2.0",

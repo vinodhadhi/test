@@ -28,9 +28,9 @@ Requirements: Python 3.12+, Node.js 20+, and a Supabase project (or a local MySQ
    npm run dev -- --host 0.0.0.0
    ```
 
-4. Open `http://localhost:5173`. The Vite development proxy sends API requests to `http://localhost:8000`; for a backend on another host, set `VITE_API_PROXY_TARGET` before starting Vite.
+4. Open `http://localhost:5173`. The Vite development proxy forwards `/api/*` requests to `http://localhost:8000`, removing the `/api` prefix. For a backend on another host, set `VITE_API_PROXY_TARGET` before starting Vite. Page routes such as `/bugs` remain frontend pages.
 
-   Bug discussions use `/ws/bugs/{id}/chat` for live comments and typing indicators. The Vite proxy forwards WebSocket upgrades automatically. A production reverse proxy must forward WebSocket upgrades for `/ws` to the backend. The live event hub is in memory, so run one API worker until a shared pub/sub service is added; comments remain stored in PostgreSQL and clients refetch them on reconnect.
+   Bug discussions use `/api/ws/bugs/{id}/chat` for live comments and typing indicators. The Vite proxy forwards WebSocket upgrades automatically. A production reverse proxy must forward `/api/*` to the backend after removing `/api`, support WebSocket upgrades, and rewrite the refresh cookie path from `/auth` to `/api/auth`. Alternatively, set `VITE_API_URL` to the backend origin at build time. The live event hub is in memory, so run one API worker until a shared pub/sub service is added; comments remain stored in PostgreSQL and clients refetch them on reconnect.
 
    Testers can attach screenshots, PDFs, and MP4 or WebM workflow videos (up to 25 MB per file) when reporting a bug. The selected video can be previewed before submission, and uploaded videos play on the issue page. Uploads require valid Google Drive credentials on the backend.
 5. In a third PowerShell window, create demo users and data (optional):

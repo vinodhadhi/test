@@ -17,6 +17,7 @@ from app.schemas.admin import (
     ProjectCreate,
     ProjectMembersUpdate,
     ProjectOut,
+    ProjectLifecycleUpdate,
     ProjectUpdate,
     UserCreate,
     UserOut,
@@ -154,6 +155,43 @@ def update_project(project_id: int, payload: ProjectUpdate, _manager: User = Dep
     _commit_or_conflict(db, "A project with this name already exists")
     db.refresh(project)
     return project
+
+
+@router.put("/projects/{project_id}/lifecycle", response_model=ProjectOut, dependencies=[Depends(require_csrf)])
+def update_project_lifecycle(project_id: int, payload: ProjectLifecycleUpdate, _actor: User = Depends(_manager), db: Session = Depends(get_db)) -> Project:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if payload.start_date and payload.target_date and payload.target_date < payload.start_date:
+        raise HTTPException(status_code=422, detail="Target date must be on or after start date")
+    for key, value in payload.model_dump().items():
+        setattr(project, key, value)
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+@router.get("/projects/{project_id}/lifecycle")
+def project_lifecycle(project_id: int, _actor: User = Depends(_manager), db: Session = Depends(get_db)) -> dict:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    counts = {bug_status: count for bug_status, count in db.execute(select(Bug.status, func.count(Bug.id)).where(Bug.project_id == project_id).group_by(Bug.status))}
+    total = sum(counts.values())
+    unresolved = sum(counts.get(status, 0) for status in (BugStatus.OPEN, BugStatus.REOPENED, BugStatus.IN_PROGRESS))
+    high_priority = db.scalar(select(func.count(Bug.id)).where(Bug.project_id == project_id, Bug.status.not_in([BugStatus.FIXED, BugStatus.VERIFIED]), Bug.severity.in_(["Critical", "High"]))) or 0
+    module_count = db.scalar(select(func.count(Module.id)).where(Module.project_id == project_id)) or 0
+    member_count = db.scalar(select(func.count(ProjectMember.user_id)).where(ProjectMember.project_id == project_id)) or 0
+    latest_activity = db.scalar(select(func.max(Bug.updated_at)).where(Bug.project_id == project_id))
+    verified = counts.get(BugStatus.VERIFIED, 0)
+    return {
+        "project_id": project_id, "total": total, "open": counts.get(BugStatus.OPEN, 0),
+        "reopened": counts.get(BugStatus.REOPENED, 0), "in_progress": counts.get(BugStatus.IN_PROGRESS, 0),
+        "fixed": counts.get(BugStatus.FIXED, 0), "verified": verified, "unresolved": unresolved,
+        "high_priority_unresolved": high_priority, "verification_percent": round(verified / total * 100, 1) if total else 0,
+        "module_count": module_count, "member_count": member_count,
+        "last_issue_activity": latest_activity,
+    }
 
 
 @router.get("/projects/{project_id}/modules", response_model=list[ModuleOut])

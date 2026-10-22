@@ -17,4 +17,5 @@ frontend/dist/
 frontend/.vite/
 frontend/*.log
 secrets/
+backend/secrets/
 *.py[cod]

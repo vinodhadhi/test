@@ -1,6 +1,7 @@
 export type Role = 'Admin' | 'Manager' | 'Tester' | 'Developer'
 export type User = { id: number; user_id: string; full_name: string; role: Role; is_active: boolean }
-export type Project = { id: number; name: string; description: string | null; created_by: number }
+export type Project = { id: number; name: string; description: string | null; created_by: number; lifecycle_stage: string; start_date: string | null; target_date: string | null; health_note: string | null }
+export type ProjectLifecycle = { project_id: number; total: number; open: number; reopened: number; in_progress: number; fixed: number; verified: number; unresolved: number; high_priority_unresolved: number; verification_percent: number; module_count: number; member_count: number; last_issue_activity: string | null }
 export type Module = { id: number; project_id: number; name: string }
 export type BugStatus = 'Open' | 'In Progress' | 'Fixed' | 'Verified' | 'Reopened'
 export type BugSeverity = 'Critical' | 'High' | 'Medium' | 'Low'
@@ -20,9 +21,9 @@ export type TeamWorkload = { user_id: number; full_name: string; role: 'Tester' 
 export type Notification = { id: number; kind: string; title: string; message: string; link: string; created_at: string; read_at: string | null }
 export type NotificationPage = { items: Notification[]; unread_count: number }
 
-// Empty VITE_API_URL uses the current origin; the production web server proxies
-// API paths to the backend, which also works when accessed from another device.
-const apiBase = import.meta.env.VITE_API_URL ?? ''
+// Keep API requests separate from SPA routes such as /bugs and /dashboard.
+// VITE_API_URL can point directly to a separately hosted backend in production.
+const apiBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api'
 
 export function chatSocketUrl(bugId: number): string {
   const url = new URL(`${apiBase}/ws/bugs/${bugId}/chat`, window.location.origin)
@@ -91,6 +92,7 @@ export const endpoints = {
   transitionBug: (id: number, to_status: BugStatus, comment?: string) => api<Bug>(`/bugs/${id}/transition`, { method: 'POST', body: JSON.stringify({ to_status, comment }) }),
   addComment: (id: number, body: string) => api<BugComment>(`/bugs/${id}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
   uploadAttachment: (id: number, file: File, duration_seconds?: number) => { const form = new FormData(); form.append('file', file); if (duration_seconds !== undefined) form.append('duration_seconds', String(duration_seconds)); return api<Attachment>(`/bugs/${id}/attachments`, { method: 'POST', body: form }) },
+  attachmentStorage: () => api<{ mode: 'drive' | 'local'; configured: boolean }>('/attachments/storage'),
   attachmentUrl: (id: number) => `${apiBase}/attachments/${id}/download`,
   dashboardSummary: () => api<DashboardSummary>('/dashboard/summary'),
   personalDashboard: () => api<PersonalDashboard>('/dashboard/me'),
@@ -104,6 +106,8 @@ export const endpoints = {
   managerProjects: () => api<Project[]>('/manager/projects'),
   managerCreateProject: (data: { name: string; description: string }) => api<Project>('/manager/projects', { method: 'POST', body: JSON.stringify(data) }),
   managerUpdateProject: (id: number, data: { name: string; description: string }) => api<Project>(`/manager/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  managerProjectLifecycle: (id: number) => api<ProjectLifecycle>(`/manager/projects/${id}/lifecycle`),
+  managerUpdateLifecycle: (id: number, data: { lifecycle_stage: string; start_date: string | null; target_date: string | null; health_note: string | null }) => api<Project>(`/manager/projects/${id}/lifecycle`, { method: 'PUT', body: JSON.stringify(data) }),
   managerModules: (projectId: number) => api<Module[]>(`/manager/projects/${projectId}/modules`),
   managerCreateModule: (projectId: number, name: string) => api<Module>(`/manager/projects/${projectId}/modules`, { method: 'POST', body: JSON.stringify({ name }) }),
   managerDeleteModule: (projectId: number, moduleId: number) => api<void>(`/manager/projects/${projectId}/modules/${moduleId}`, { method: 'DELETE' }),

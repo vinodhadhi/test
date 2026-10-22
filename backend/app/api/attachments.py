@@ -1,5 +1,6 @@
 import asyncio
 from io import BytesIO
+from pathlib import Path
 from urllib.parse import quote
 
 import filetype
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.bugs import _bug_or_404
 from app.api.deps import current_user, get_db, require_csrf
+from app.core.config import settings
 from app.models.bug import Attachment, AttachmentKind
 from app.models.user import User, UserRole
 from app.schemas.bugs import AttachmentOut
@@ -18,7 +20,18 @@ from app.services.drive_service import DriveStorageError, drive_service
 
 router = APIRouter(tags=["Attachments"])
 MAX_BYTES = 25 * 1024 * 1024
-ALLOWED_EXACT = {"video/webm", "video/mp4", "audio/webm", "audio/mp4", "audio/mpeg", "application/pdf"}
+ALLOWED_EXACT = {"video/webm", "video/mp4", "application/pdf"}
+
+
+@router.get("/attachments/storage")
+def attachment_storage_status(_actor: User = Depends(current_user)) -> dict[str, str | bool]:
+    configured = settings.attachment_storage == "local" or bool(
+        settings.drive_shared_folder_id and (
+            Path(settings.google_drive_oauth_token_file).is_file()
+            or settings.google_application_credentials and Path(settings.google_application_credentials).is_file()
+        )
+    )
+    return {"mode": settings.attachment_storage, "configured": configured}
 
 
 def _kind_for(mime: str) -> AttachmentKind:
@@ -26,8 +39,6 @@ def _kind_for(mime: str) -> AttachmentKind:
         return AttachmentKind.SCREENSHOT
     if mime.startswith("video/"):
         return AttachmentKind.VIDEO
-    if mime.startswith("audio/"):
-        return AttachmentKind.VOICE
     return AttachmentKind.FILE
 
 
@@ -37,12 +48,10 @@ def _content_matches(mime: str, content: bytes) -> bool:
         return bool(detected and detected.startswith("image/"))
     if mime == "application/pdf":
         return content.startswith(b"%PDF-")
-    if mime in {"video/mp4", "audio/mp4"}:
+    if mime == "video/mp4":
         return len(content) >= 12 and content[4:8] == b"ftyp"
-    if mime in {"video/webm", "audio/webm"}:
+    if mime == "video/webm":
         return content.startswith(b"\x1a\x45\xdf\xa3")
-    if mime == "audio/mpeg":
-        return content.startswith(b"ID3") or (len(content) > 1 and content[0] == 0xFF and content[1] & 0xE0 == 0xE0)
     return False
 
 
@@ -60,11 +69,11 @@ async def upload_attachment(
         raise HTTPException(status_code=403, detail="Managers have read-only access")
     mime = (file.content_type or "application/octet-stream").split(";", 1)[0].strip().lower()
     if not (mime.startswith("image/") or mime in ALLOWED_EXACT):
-        raise HTTPException(status_code=415, detail="Allowed files are images, WebM/MP4 video or audio, MP3 audio, and PDF")
+        raise HTTPException(status_code=415, detail="Allowed files are images, WebM/MP4 video, and PDF")
     if duration_seconds is not None and duration_seconds > 120:
         raise HTTPException(status_code=422, detail="Recording duration cannot exceed two minutes")
-    if duration_seconds is not None and not (mime.startswith("audio/") or mime.startswith("video/")):
-        raise HTTPException(status_code=422, detail="Duration is only valid for audio or video recordings")
+    if duration_seconds is not None and not mime.startswith("video/"):
+        raise HTTPException(status_code=422, detail="Duration is only valid for video uploads")
     chunks: list[bytes] = []
     total = 0
     while chunk := await file.read(1024 * 1024):
