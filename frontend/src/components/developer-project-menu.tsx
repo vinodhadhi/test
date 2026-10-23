@@ -15,10 +15,7 @@ export function DeveloperProjectMenu() {
     <div className="developer-project-submenu">
       {projects.isPending ? <p role="status">Loading projects…</p> : projects.isError ? <div role="alert"><p>Could not load projects.</p><button type="button" onClick={(event) => { event.stopPropagation(); projects.refetch() }}>Retry</button></div>
         : projects.data.length === 0 ? <p>No projects assigned yet.</p>
-          : [...projects.data].sort((a, b) => a.name.localeCompare(b.name)).map((project) => <details className="developer-project-entry" key={project.id}>
-            <summary onClick={(event) => event.stopPropagation()}><span>{project.name}</span><ChevronDown size={15} /></summary>
-            <div className="developer-project-queue"><Link to={`/bugs?project=${project.id}`} className={selected === String(project.id) ? 'active' : ''} aria-current={selected === String(project.id) ? 'page' : undefined} aria-label={`My queue for ${project.name}`}>My queue</Link></div>
-          </details>)}
+          : [...projects.data].sort((a, b) => a.name.localeCompare(b.name)).map((project) => <Link key={project.id} to={`/bugs?project=${project.id}`} className={selected === String(project.id) ? 'active' : ''} aria-current={selected === String(project.id) ? 'page' : undefined} title={project.name}><span>{project.name}</span></Link>)}
     </div>
   </details>
 }

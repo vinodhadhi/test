@@ -1,15 +1,11 @@
 .developer-project-menu { min-width: 0; }
-.developer-project-menu summary { display: flex; align-items: center; gap: 10px; padding: 11px; cursor: pointer; color: var(--text); font-size: 13px; font-weight: 600; border-radius: 8px; list-style: none; }
-.developer-project-menu summary::-webkit-details-marker { display: none; }
-.developer-project-menu summary:hover { background: var(--soft); }
-.project-menu-count { margin-left: auto; padding: 2px 6px; border-radius: 8px; background: var(--soft); }
-.developer-project-menu:not([open]) > summary > svg:last-child,
-.developer-project-entry:not([open]) > summary > svg:last-child { transform: rotate(-90deg); }
-.developer-project-entry > summary { align-items: flex-start; }
-.developer-project-entry > summary span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.developer-project-entry > summary svg { flex-shrink: 0; margin-top: 2px; }
-.developer-project-queue { margin: 0 0 6px 12px; padding-left: 8px; border-left: 1px solid var(--border); }
-.developer-project-submenu { margin-left: 19px; padding-left: 8px; border-left: 1px solid var(--border); }
-.developer-project-submenu a span { overflow-wrap: anywhere; white-space: normal; }
-.developer-project-submenu small { display: block; font-size: 11px; color: var(--muted); margin-top: 3px; }
+.developer-project-menu > summary { display: flex; align-items: center; gap: 12px; min-height: 43px; padding: 11px; border: 1px solid transparent; cursor: pointer; color: var(--text); font-size: 12.5px; font-weight: 600; border-radius: 8px; list-style: none; }
+.developer-project-menu > summary::-webkit-details-marker { display: none; }
+.developer-project-menu > summary:hover { background: var(--soft); }
+.developer-project-menu > summary > svg { flex-shrink: 0; }
+.developer-project-menu > summary > svg:last-child { margin-left: auto; }
+.developer-project-menu:not([open]) > summary > svg:last-child { transform: rotate(-90deg); }
+.developer-project-submenu { min-width: 0; margin-left: 20px; padding-left: 8px; border-left: 1px solid var(--border); }
+.main-nav .developer-project-submenu a { min-width: 0; text-align: left; }
+.developer-project-submenu a span { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.5; }
 .developer-project-submenu p { padding: 8px; font-size: 12px; color: var(--muted); }
