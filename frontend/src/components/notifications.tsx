@@ -3,13 +3,15 @@ import { Bell } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { endpoints, type Notification } from '../api/client'
+import { useNotificationSocket } from './use-notification-socket'
 
 export function Notifications() {
   const client = useQueryClient()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const wrapper = useRef<HTMLDivElement>(null)
-  const query = useQuery({ queryKey: ['notifications'], queryFn: endpoints.notifications, refetchInterval: 15000, refetchOnWindowFocus: true })
+  const connected = useNotificationSocket()
+  const query = useQuery({ queryKey: ['notifications'], queryFn: endpoints.notifications, refetchInterval: connected ? false : 15000, refetchOnWindowFocus: true })
   const readOne = useMutation({ mutationFn: endpoints.markNotificationRead, onSuccess: () => client.invalidateQueries({ queryKey: ['notifications'] }) })
   const readAll = useMutation({ mutationFn: endpoints.markAllNotificationsRead, onSuccess: () => client.invalidateQueries({ queryKey: ['notifications'] }) })
 

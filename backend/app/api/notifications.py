@@ -1,11 +1,17 @@
+import asyncio
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+import jwt
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.deps import current_user, get_db, require_csrf
+from app.api.chat import _origin_allowed
+from app.core.database import SessionLocal
+from app.core.security import decode_token
 from app.models.notification import Notification
 from app.models.user import User
 
@@ -27,6 +33,54 @@ class NotificationOut(BaseModel):
 class NotificationPage(BaseModel):
     items: list[NotificationOut]
     unread_count: int
+
+
+def _socket_snapshot(token: str | None) -> str | None:
+    if not token:
+        return None
+    try:
+        claims = decode_token(token, expected_type="access")
+        with SessionLocal() as db:
+            actor = db.get(User, int(claims["sub"]))
+            if actor is None or not actor.is_active or actor.auth_version != claims.get("auth_version"):
+                return None
+            return list_notifications(actor, db).model_dump_json()
+    except (ValueError, TypeError, KeyError, jwt.PyJWTError):
+        return None
+
+
+@router.websocket("/ws")
+async def notification_socket(websocket: WebSocket) -> None:
+    if not _origin_allowed(websocket):
+        await websocket.close(code=1008)
+        return
+    accepted = False
+    previous = None
+    try:
+        while True:
+            # Short-lived sessions observe committed changes from every API worker
+            # and scheduled job, and recheck account/session validity each time.
+            snapshot = await asyncio.to_thread(_socket_snapshot, websocket.cookies.get("access_token"))
+            if snapshot is None:
+                await websocket.close(code=1008)
+                return
+            if not accepted:
+                await websocket.accept()
+                accepted = True
+            await websocket.send_json({"type": "notifications_changed" if snapshot != previous else "heartbeat"})
+            previous = snapshot
+            try:
+                await asyncio.wait_for(websocket.receive_text(), timeout=5)
+                # This stream is server-to-client only; mutations use CSRF-protected REST.
+                await websocket.close(code=1003)
+                return
+            except TimeoutError:
+                pass
+    except WebSocketDisconnect:
+        pass
+    except (SQLAlchemyError, OSError):
+        if accepted:
+            await websocket.close(code=1011)
 
 
 @router.get("", response_model=NotificationPage)

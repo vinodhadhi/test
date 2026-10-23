@@ -25,6 +25,12 @@ export type NotificationPage = { items: Notification[]; unread_count: number }
 // VITE_API_URL can point directly to a separately hosted backend in production.
 const apiBase = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '/api'
 
+export function notificationSocketUrl(): string {
+  const url = new URL(`${apiBase}/notifications/ws`, window.location.origin)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  return url.toString()
+}
+
 export function chatSocketUrl(bugId: number): string {
   const url = new URL(`${apiBase}/ws/bugs/${bugId}/chat`, window.location.origin)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
