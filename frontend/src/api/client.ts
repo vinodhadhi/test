@@ -104,6 +104,7 @@ export const endpoints = {
   managerTeamWorkload: () => api<TeamWorkload[]>('/manager/team/workload'),
   managerCreateUser: (data: { user_id: string; full_name: string; role: 'Tester' | 'Developer'; password: string }) => api<User>('/manager/users', { method: 'POST', body: JSON.stringify(data) }),
   managerProjects: () => api<Project[]>('/manager/projects'),
+  managerDeleteProject: (id: number) => api<void>(`/manager/projects/${id}`, { method: 'DELETE' }),
   managerCreateProject: (data: { name: string; description: string }) => api<Project>('/manager/projects', { method: 'POST', body: JSON.stringify(data) }),
   managerUpdateProject: (id: number, data: { name: string; description: string }) => api<Project>(`/manager/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   managerProjectLifecycle: (id: number) => api<ProjectLifecycle>(`/manager/projects/${id}/lifecycle`),

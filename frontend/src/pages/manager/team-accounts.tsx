@@ -25,8 +25,8 @@ export function ManagerTeamAccountsPage() {
     const user_id = String(values.get('user_id') ?? '').trim()
     const password = String(values.get('password') ?? '')
     const role = String(values.get('role') ?? 'Tester')
-    if (!full_name || !user_id || !password || !['Tester', 'Developer'].includes(role)) {
-      setNotice('Enter a name, a user ID, a password, and choose Tester or Developer.')
+    if (!full_name || !user_id || password.length < 4 || !['Tester', 'Developer'].includes(role)) {
+      setNotice('Enter a name, a user ID, a password of at least 4 characters, and choose Tester or Developer.')
       return
     }
     createUser.mutate({ full_name, user_id, password, role: role as 'Tester' | 'Developer' }, { onSuccess: () => formElement.reset() })
@@ -41,7 +41,7 @@ export function ManagerTeamAccountsPage() {
         <Field label="Full name"><Input name="full_name" required maxLength={200} placeholder="Team member name" /></Field>
         <Field label="User ID"><Input name="user_id" required minLength={2} maxLength={100} placeholder="Login user ID" /></Field>
         <Field label="Role"><Select name="role" defaultValue="Tester"><option value="Tester">Tester</option><option value="Developer">Developer</option></Select></Field>
-        <Field label="Password"><Input name="password" type="password" required maxLength={128} autoComplete="new-password" placeholder="Enter a password" /></Field>
+        <Field label="Password"><Input name="password" type="password" required minLength={4} maxLength={128} autoComplete="new-password" placeholder="At least 4 characters" /></Field>
         <div className="form-actions"><Button type="submit" disabled={createUser.isPending}><UserPlus size={15} /> {createUser.isPending ? 'Creating account…' : 'Create account'}</Button></div>
       </form>
     </Card>

@@ -157,6 +157,18 @@ def update_project(project_id: int, payload: ProjectUpdate, _manager: User = Dep
     return project
 
 
+@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_csrf)])
+def delete_project(project_id: int, _actor: User = Depends(_manager), db: Session = Depends(get_db)) -> Response:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    if db.scalar(select(Bug.id).where(Bug.project_id == project_id).limit(1)) is not None:
+        raise HTTPException(status_code=409, detail="Project cannot be deleted while it contains bugs")
+    db.delete(project)
+    _commit_or_conflict(db, "Project cannot be deleted while it contains bugs")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.put("/projects/{project_id}/lifecycle", response_model=ProjectOut, dependencies=[Depends(require_csrf)])
 def update_project_lifecycle(project_id: int, payload: ProjectLifecycleUpdate, _actor: User = Depends(_manager), db: Session = Depends(get_db)) -> Project:
     project = db.get(Project, project_id)

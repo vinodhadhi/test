@@ -15,7 +15,7 @@ class UserCreate(BaseModel):
     user_id: UserId
     full_name: PersonName
     role: UserRole
-    password: Annotated[str, Field(min_length=1, max_length=128)]
+    password: Annotated[str, Field(min_length=4, max_length=128)]
 
 
 class UserUpdate(BaseModel):
@@ -26,7 +26,7 @@ class UserUpdate(BaseModel):
 
 
 class PasswordReset(BaseModel):
-    new_password: Annotated[str, Field(min_length=1, max_length=128)]
+    new_password: Annotated[str, Field(min_length=4, max_length=128)]
 
 
 class UserOut(BaseModel):
