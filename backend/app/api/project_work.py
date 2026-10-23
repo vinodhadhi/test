@@ -41,3 +41,9 @@ def list_project_modules(project_id: int, user: User = Depends(current_user), db
 def list_project_developers(project_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> list[User]:
     project = _require_project_membership(db, user, project_id)
     return list(db.scalars(select(User).join(ProjectMember).where(ProjectMember.project_id == project.id, User.role == UserRole.DEVELOPER, User.is_active.is_(True)).order_by(User.full_name)))
+
+
+@router.get("/{project_id}/testers", response_model=list[UserOut])
+def list_project_testers(project_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)) -> list[User]:
+    project = _require_project_membership(db, user, project_id)
+    return list(db.scalars(select(User).join(ProjectMember).where(ProjectMember.project_id == project.id, User.role == UserRole.TESTER, User.is_active.is_(True)).order_by(User.full_name)))

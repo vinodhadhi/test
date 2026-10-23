@@ -95,6 +95,8 @@ export const endpoints = {
   bug: (id: number) => api<Bug>(`/bugs/${id}`),
   createBug: (data: Record<string, unknown>) => api<Bug>('/bugs', { method: 'POST', body: JSON.stringify(data) }),
   updateBug: (id: number, data: Partial<Pick<Bug, 'module_id' | 'title' | 'steps' | 'expected_result' | 'actual_result' | 'severity' | 'priority' | 'type' | 'assigned_to' | 'environment' | 'build_version' | 'reference_url'>>) => api<Bug>(`/bugs/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  handoffBug: (id: number, recipient_role: 'Developer' | 'Tester', recipient_id: number) => api<Bug>(`/bugs/${id}/handoff`, { method: 'POST', body: JSON.stringify({ recipient_role, recipient_id }) }),
+  projectTesters: (projectId: number) => api<User[]>(`/my/projects/${projectId}/testers`),
   transitionBug: (id: number, to_status: BugStatus, comment?: string) => api<Bug>(`/bugs/${id}/transition`, { method: 'POST', body: JSON.stringify({ to_status, comment }) }),
   addComment: (id: number, body: string) => api<BugComment>(`/bugs/${id}/comments`, { method: 'POST', body: JSON.stringify({ body }) }),
   uploadAttachment: (id: number, file: File, duration_seconds?: number) => { const form = new FormData(); form.append('file', file); if (duration_seconds !== undefined) form.append('duration_seconds', String(duration_seconds)); return api<Attachment>(`/bugs/${id}/attachments`, { method: 'POST', body: form }) },
