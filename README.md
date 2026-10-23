@@ -66,3 +66,9 @@ Frontend check (from `frontend`): `npm run build`.
 - **Developer:** personal dashboard and queue for assigned bugs and status changes.
 
 The application currently authenticates its own user records; Supabase Auth keys are optional metadata and do not enable Supabase Auth login. The Supabase secret key is not needed. Never place it in the frontend. In production, use HTTPS, `APP_ENV=production`, `COOKIE_SECURE=true`, and an HTTPS `FRONTEND_ORIGIN`.
+
+## Local backend fallback
+
+Vite uses `https://test-seven-woad-nvkrw3zwum.vercel.app` first. It checks that backend's `/health` endpoint before forwarding `/api` requests (a 1.5 second timeout, cached for 3 seconds). When unavailable or unhealthy, it uses the local backend at `http://127.0.0.1:8000`. It returns to the deployed backend when health recovers. Override the URLs with `VITE_API_PROXY_TARGET` and `VITE_API_FALLBACK_TARGET` in the frontend launch environment. Clear any old local `VITE_API_PROXY_TARGET` override to use the deployed backend first. Keep browser requests on `/api`; a direct `VITE_API_URL` bypasses this routing.
+
+Requests are routed before sending; failed writes are never replayed. Health reports availability only, not database readiness. Switching between servers may require signing in again if their authentication secrets differ. Secure cookies from the deployed backend require an HTTPS frontend. Live chat also depends on the fallback host supporting WebSockets. This routing runs in the local Vite server; production hosting needs an equivalent reverse proxy.
