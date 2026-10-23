@@ -1,12 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Paperclip, Send, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { z } from 'zod'
 import { endpoints, type Module, type Project, type User } from '../../api/client'
 import { Button, Card, Field, Input, Notice, PageHeader, Select, Textarea } from '../../components/ui'
+
+import { ScreenRecorder } from '../../components/screen-recorder'
 
 const schema = z.object({ project_id: z.coerce.number().int().positive('Choose a project'), module_id: z.coerce.number().int().positive('Choose a module'), title: z.string().trim().min(3, 'Add a descriptive title').max(300), steps: z.string().trim().min(1, 'Describe how to reproduce this issue'), expected_result: z.string().trim().min(1), actual_result: z.string().trim().min(1), severity: z.enum(['Critical', 'High', 'Medium', 'Low']), priority: z.string().trim().min(1).max(30), type: z.enum(['Frontend', 'Backend']), assigned_to: z.coerce.number().int().positive('Choose a developer'), environment: z.string().max(300), build_version: z.string().max(100), reference_url: z.string().max(2048).refine((value) => !value || (z.string().url().safeParse(value).success && /^https?:\/\//i.test(value)), 'Enter an HTTP or HTTPS link') })
 type Values = z.infer<typeof schema>
@@ -29,6 +31,8 @@ export function ReportBugPage() {
   const me = useQuery({ queryKey: ['me'], queryFn: endpoints.me })
   const projects = useQuery({ queryKey: ['my-projects'], queryFn: endpoints.myProjects })
   const [files, setFiles] = useState<File[]>([])
+  const [recordingBusy, setRecordingBusy] = useState(false)
+  const recordingBusyRef = useRef(false)
   const [clientError, setClientError] = useState('')
   const [uploadProgress, setUploadProgress] = useState<{ completed: number; total: number } | null>(null)
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { severity: 'Medium', priority: 'Medium', type: 'Frontend', project_id: 0, module_id: 0, assigned_to: 0, environment: '', build_version: '', reference_url: '' } })
@@ -37,6 +41,7 @@ export function ReportBugPage() {
   const developers = useQuery({ queryKey: ['project-developers', selectedProjectId], queryFn: () => endpoints.projectDevelopers(selectedProjectId), enabled: selectedProjectId > 0 })
   const projectField = register('project_id', { setValueAs: (value) => Number(value) || 0 })
   const mutation = useMutation({ mutationFn: async (values: Values) => {
+    if (recordingBusyRef.current) throw new Error("Stop recording before submitting the bug.")
     const selectedFiles = [...files]
     if (selectedFiles.length) {
       const storage = await endpoints.attachmentStorage()
@@ -53,17 +58,18 @@ export function ReportBugPage() {
     return { bug, failedFiles }
   }, onSuccess: ({ bug, failedFiles }) => { client.invalidateQueries({ queryKey: ['dashboard'] }); client.invalidateQueries({ queryKey: ['bugs'] }); navigate(`/bugs/${bug.id}`, { replace: true, state: { notice: `Bug #${bug.bug_no} was reported.`, warning: failedFiles.length ? `${failedFiles.length} attachment${failedFiles.length === 1 ? '' : 's'} could not be uploaded (${failedFiles.map((file) => file.name).join(', ')}): ${failedFiles[0].reason}. You can retry from this issue page.` : undefined } }) }, onError: (error: Error) => setClientError(error.message) })
 
-  const addFiles = (incoming: FileList | null, kind: 'support' | 'video') => {
+  const addFiles = (incoming: FileList | File[] | null) => {
     setClientError('')
     if (!incoming) return
     const accepted = Array.from(incoming).map((file) => {
-      if (kind !== 'video' || file.type) return file
+      if (file.type) return file
       const extension = file.name.toLowerCase().split('.').pop()
-      const mime = extension === 'mp4' ? 'video/mp4' : extension === 'webm' ? 'video/webm' : ''
+      const mime = extension === 'mp4' ? 'video/mp4' : extension === 'webm' ? 'video/webm' : extension === 'png' ? 'image/png' : extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : extension === 'gif' ? 'image/gif' : extension === 'webp' ? 'image/webp' : extension === 'pdf' ? 'application/pdf' : ''
       return mime ? new File([file], file.name, { type: mime, lastModified: file.lastModified }) : file
     })
-    const invalid = accepted.find((file) => file.size > MAX_BYTES || (kind === 'video' ? !VIDEO_TYPES.has(file.type) : !(file.type.startsWith('image/') || file.type === 'application/pdf')))
-    if (invalid) { setClientError(`${invalid.name} is unsupported or larger than 25 MB.`); return }
+    const validType = (file: File) => file.type.startsWith('image/') || VIDEO_TYPES.has(file.type) || file.type === 'application/pdf'
+    const invalid = accepted.find((file) => file.size > MAX_BYTES || !validType(file))
+    if (invalid) { setClientError(`${invalid.name} is unsupported for this field or larger than 25 MB.`); return }
     setFiles((current) => [...current, ...accepted])
   }
   const projectError = projects.error ?? modules.error ?? developers.error
@@ -79,11 +85,11 @@ export function ReportBugPage() {
         <div className="report-grid report-grid-3"><Field label="Severity" error={errors.severity?.message}><Select {...register('severity')}><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></Select></Field><Field label="Priority" error={errors.priority?.message}><Select {...register('priority')}><option>High</option><option>Medium</option><option>Low</option></Select></Field><Field label="Issue type" error={errors.type?.message}><Select {...register('type')}><option>Frontend</option><option>Backend</option></Select></Field><Field label="Assign developer" error={errors.assigned_to?.message}><Select {...register('assigned_to')} disabled={!selectedProjectId || developers.isPending || developers.isError || !developers.data?.length}><option value={0}>{developers.isPending ? 'Loading team…' : 'Select developer'}</option>{(developers.data ?? []).map((developer: User) => <option key={developer.id} value={developer.id}>{developer.full_name}</option>)}</Select></Field></div>
         <div className="report-grid"><Field label="Environment (optional)"><Input placeholder="e.g. Chrome 128 · Windows 11" maxLength={300} {...register('environment')} /></Field><Field label="Build version (optional)"><Input placeholder="e.g. 2.4.1-beta" maxLength={100} {...register('build_version')} /></Field></div>
         <Field label="Reference link (optional)" error={errors.reference_url?.message}><Input type="url" placeholder="https://example.com/api/issues/123" maxLength={2048} {...register('reference_url')} /></Field>
-        <div className="report-divider" /><div className="report-section-head"><span>02</span><div><h2>Evidence</h2><p>Upload screenshots, a workflow video, or a PDF. Up to 25 MB per file.</p></div></div>
-        <div className="upload-zone"><Paperclip size={17} /><div><b>Screenshots and PDF</b><small>Images or PDF · Up to 25 MB each</small></div><label className="button button-secondary">Choose files<input type="file" hidden multiple accept="image/*,application/pdf" onChange={(event) => { addFiles(event.target.files, 'support'); event.currentTarget.value = '' }} /></label></div>
-        <div className="upload-zone"><Paperclip size={17} /><div><b>Upload workflow video</b><small>MP4 or WebM · Up to 25 MB each</small></div><label className="button button-secondary">Choose video<input type="file" hidden multiple accept="video/mp4,video/webm" onChange={(event) => { addFiles(event.target.files, 'video'); event.currentTarget.value = '' }} /></label></div>
-        {files.length > 0 && <div className="file-list">{files.map((file, index) => <div className="file-item file-item-preview" key={`${file.name}-${index}`}><div className="file-item-details"><Paperclip size={14} /><span>{file.name}<small>{(file.size / 1024 / 1024).toFixed(2)} MB</small></span><button type="button" onClick={() => setFiles((current) => current.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`}><Trash2 size={15} /></button></div>{VIDEO_TYPES.has(file.type) && <WorkflowVideoPreview file={file} />}</div>)}</div>}
-        <div className="report-submit"><span>{mutation.isPending && uploadProgress?.total ? `Uploading evidence ${uploadProgress.completed} of ${uploadProgress.total}…` : `Reported by ${me.data?.full_name ?? 'you'} · Assigned developer will be notified in the workspace`}</span><Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Submitting…' : 'Submit bug'} <Send size={14} /></Button></div>
+        <div className="report-divider" /><div className="report-section-head"><span>02</span><div><h2>Evidence</h2><p>Attach photos, videos, PDFs, and screen recordings together in one submission. Up to 25 MB per file.</p></div></div>
+        <div className="upload-zone"><Paperclip size={17} /><div><b>Screenshots, videos, and PDF</b><small>Images, MP4, WebM, or PDF · Up to 25 MB each</small></div><label className="button button-secondary">Choose files<input type="file" hidden multiple disabled={mutation.isPending} accept="image/*,video/mp4,video/webm,application/pdf" onChange={(event) => { addFiles(event.target.files); event.currentTarget.value = '' }} /></label></div>
+        <ScreenRecorder disabled={mutation.isPending} onFile={(file) => addFiles([file])} onError={setClientError} onBusy={(busy) => { recordingBusyRef.current = busy; setRecordingBusy(busy) }} />
+        {files.length > 0 && <div className="file-list">{files.map((file, index) => <div className="file-item file-item-preview" key={`${file.name}-${index}`}><div className="file-item-details"><Paperclip size={14} /><span>{file.name}<small>{(file.size / 1024 / 1024).toFixed(2)} MB</small></span><button type="button" disabled={mutation.isPending} onClick={() => setFiles((current) => current.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`}><Trash2 size={15} /></button></div>{VIDEO_TYPES.has(file.type) && <WorkflowVideoPreview file={file} />}</div>)}</div>}
+        <div className="report-submit"><span>{mutation.isPending && uploadProgress?.total ? `Uploading evidence ${uploadProgress.completed} of ${uploadProgress.total}…` : `Reported by ${me.data?.full_name ?? 'you'} · Assigned developer will be notified in the workspace`}</span><Button type="submit" disabled={mutation.isPending || recordingBusy}>{mutation.isPending ? 'Submitting…' : 'Submit bug'} <Send size={14} /></Button></div>
       </form>
     </Card>
   </>
