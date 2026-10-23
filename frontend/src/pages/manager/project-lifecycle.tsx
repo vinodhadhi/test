@@ -25,10 +25,12 @@ export function ProjectLifecyclePanel({ project }: { project: Project }) {
   })
   const data = summary.data
   const targetPassed = Boolean(targetDate && targetDate < new Date().toISOString().slice(0, 10) && stage !== 'Released')
+  const daysUntilTarget = targetDate ? Math.ceil((new Date(`${targetDate}T00:00:00`).getTime() - new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00`).getTime()) / 86400000) : null
   return <section className="project-lifecycle-panel" aria-label={`${project.name} lifecycle`}>
     <div className="section-heading"><div><h3>Project lifecycle</h3><span>Plan milestones and review QA health</span></div></div>
     <div className="lifecycle-grid">
       <div className="lifecycle-plan">
+        <div className={`lifecycle-deadline${targetPassed ? ' overdue' : ''}`}><span>Project deadline</span><strong>{targetDate ? new Date(`${targetDate}T00:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'No deadline set'}</strong><small>{targetDate ? stage === 'Released' ? 'Project released' : targetPassed ? `${Math.abs(daysUntilTarget ?? 0)} days overdue` : daysUntilTarget === 0 ? 'Due today' : `${daysUntilTarget} days remaining · Daily reminder at 9:00 AM` : 'Set a target date to enable daily reminders at 9:00 AM'}</small></div>
         <div className="lifecycle-fields">
           <Field label="Stage"><Select value={stage} onChange={(event) => { setStage(event.target.value); setSaved(false) }}>{stages.map((item) => <option key={item}>{item}</option>)}</Select></Field>
           <Field label="Start date"><Input type="date" value={startDate} onChange={(event) => { setStartDate(event.target.value); setSaved(false) }} /></Field>

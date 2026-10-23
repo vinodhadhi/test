@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -14,8 +17,31 @@ from app.api.manager_projects import router as manager_projects_router
 from app.api.notifications import router as notifications_router
 from app.api.project_work import router as project_work_router
 from app.core.config import settings
+from app.services.lifecycle_reminders import deliver_daily_deadline_reminders
 
-app = FastAPI(title="Bug Tracking & QA Progress API", version="0.1.0")
+
+async def _deadline_reminder_loop() -> None:
+    while True:
+        try:
+            await asyncio.to_thread(deliver_daily_deadline_reminders)
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).exception("Could not deliver project deadline reminders")
+        await asyncio.sleep(60)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    task = asyncio.create_task(_deadline_reminder_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+app = FastAPI(title="Bug Tracking & QA Progress API", version="0.1.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
