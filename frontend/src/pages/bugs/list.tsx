@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { AlertCircle, ArrowUpRight, Bug as BugIcon, CircleCheck, Clock3, Plus, Search, X } from 'lucide-react'
+import { AlertCircle, ArrowUpRight, ClipboardList as BugIcon, CircleCheck, Clock3, Plus, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { endpoints, type Bug, type BugSeverity } from '../../api/client'

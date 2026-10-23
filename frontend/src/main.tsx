@@ -6,6 +6,7 @@ import App from './app'
 import { PageErrorBoundary } from './components/ui'
 import './styles.css'
 import './workspace.css'
+import './visual-refresh.css'
 
 if (localStorage.getItem('qa-dark') === 'yes') document.documentElement.classList.add('dark')
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000, refetchOnWindowFocus: false } } })

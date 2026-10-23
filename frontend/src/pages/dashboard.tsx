@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { Activity, BadgeCheck, Bug, CircleDot, Code2, UsersRound } from 'lucide-react'
+import { Activity, BadgeCheck, CircleDot, ClipboardList, Code2, UsersRound } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { endpoints } from '../api/client'
 
@@ -17,7 +17,7 @@ export function DashboardPage() {
   if (failed) return <ErrorState message={failed.error instanceof Error ? failed.error.message : 'Could not load dashboard data.'} />
   const data = summary.data!
   const cards = [
-    { label: 'Total bugs', value: data.total, icon: Bug, tone: 'blue' },
+    { label: 'Total bugs', value: data.total, icon: ClipboardList, tone: 'blue' },
     { label: 'Open & reopened', value: data.open, icon: CircleDot, tone: 'amber' },
     { label: 'In progress', value: data.in_progress, icon: Activity, tone: 'violet' },
     { label: 'Fixed', value: data.fixed, icon: BadgeCheck, tone: 'blue' },
@@ -28,7 +28,7 @@ export function DashboardPage() {
     <div className="page-heading"><div><span className="eyebrow">QUALITY OVERVIEW</span><h1>Progress dashboard</h1><p>Bug resolution and team workload across projects.</p></div></div>
     <div className="metric-grid">{cards.map(({ label, value, icon: Icon, tone }) => <article className="metric-card" key={label}><div className={`metric-icon ${tone}`}><Icon size={18} /></div><span>{label}</span><strong>{value}</strong></article>)}</div>
     <div className="dashboard-grid">
-      <section className="panel dashboard-chart"><div className="panel-heading"><div><h2>Project progress</h2><p>Verified and fixed bugs by project</p></div></div>{projects.data!.length ? <div className="chart-wrap"><ResponsiveContainer width="100%" height="100%"><BarChart data={projects.data!} margin={{ top: 10, right: 12, left: -18, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="project_name" tickLine={false} axisLine={false} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><Tooltip /><Bar dataKey="verified" name="Verified" fill="#1f9d70" radius={[5, 5, 0, 0]} /><Bar dataKey="fixed" name="Fixed" fill="#5995e9" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer></div> : <p className="empty-state">No projects to report yet.</p>}</section>
+      <section className="panel dashboard-chart"><div className="panel-heading"><div><h2>Project progress</h2><p>Verified and fixed bugs by project</p></div></div>{projects.data!.length ? <div className="chart-wrap"><ResponsiveContainer width="100%" height="100%"><BarChart data={projects.data!} margin={{ top: 10, right: 12, left: -18, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="project_name" tickLine={false} axisLine={false} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} /><Tooltip /><Bar dataKey="verified" name="Verified" fill="#54af88" radius={[5, 5, 0, 0]} /><Bar dataKey="fixed" name="Fixed" fill="#6d82dd" radius={[5, 5, 0, 0]} /></BarChart></ResponsiveContainer></div> : <p className="empty-state">No projects to report yet.</p>}</section>
       <section className="panel dashboard-chart"><div className="panel-heading"><div><h2>Module coverage</h2><p>Verified bugs against reported bugs</p></div></div><div className="module-progress-list">{modules.data!.length ? modules.data!.map((module) => <div className="module-progress" key={module.module_id}><div className="module-progress-copy"><span>{module.project_name} · {module.module_name}</span><small>{module.verified}/{module.total} verified</small></div><div className="progress-track"><span style={{ width: `${module.total ? Math.round(module.verified / module.total * 100) : 0}%` }} /></div></div>) : <p className="empty-state">No modules to report yet.</p>}</div></section>
       <section className="panel team-panel"><div className="panel-heading"><div><h2><UsersRound size={17} /> Tester activity</h2><p>Raised bugs, retest queue, verified and reopened</p></div></div><PeopleTable rows={testers.data!.map((person) => ({ user_id: person.user_id, full_name: person.full_name, metrics: [{ label: 'Raised', value: person.raised }, { label: 'To retest', value: person.to_retest }, { label: 'Verified', value: person.verified }, { label: 'Reopened', value: person.reopened }] }))} empty="No testers yet." /></section>
       <section className="panel team-panel"><div className="panel-heading"><div><h2><Code2 size={17} /> Developer workload</h2><p>Assigned, to do, in progress and done</p></div></div><PeopleTable rows={developers.data!.map((person) => ({ user_id: person.user_id, full_name: person.full_name, metrics: [{ label: 'Assigned', value: person.assigned }, { label: 'To do', value: person.to_do }, { label: 'In progress', value: person.in_progress }, { label: 'Done', value: person.done }] }))} empty="No developers yet." /></section>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 340" role="img" aria-labelledby="title description">
+  <title id="title">Issue workflow illustration</title>
+  <desc id="description">A report card flows into a progress chart and ends in a verified card.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#f2f5ff"/></linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#87a6ff"/><stop offset="1" stop-color="#b4e5c6"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#06133f" flood-opacity=".24"/></filter>
+  </defs>
+  <path d="M63 185C157 101 267 285 382 167S492 138 533 148" fill="none" stroke="url(#line)" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="189" cy="184" r="8" fill="#d9e4ff" stroke="#7998ee" stroke-width="3"/>
+  <circle cx="375" cy="173" r="8" fill="#d9e4ff" stroke="#7998ee" stroke-width="3"/>
+  <g filter="url(#shadow)">
+    <rect x="18" y="78" width="180" height="167" rx="17" fill="url(#panel)"/>
+    <rect x="38" y="98" width="78" height="21" rx="7" fill="#e9edff"/>
+    <text x="47" y="113" fill="#4457a8" font-family="Arial,sans-serif" font-size="11" font-weight="700">REPORT</text>
+    <rect x="38" y="139" width="115" height="9" rx="4.5" fill="#253254"/>
+    <rect x="38" y="156" width="138" height="7" rx="3.5" fill="#b7c2d9"/>
+    <rect x="38" y="172" width="104" height="7" rx="3.5" fill="#cdd5e6"/>
+    <rect x="38" y="207" width="54" height="17" rx="8.5" fill="#ffe5d9"/>
+    <text x="48" y="219" fill="#ad664b" font-family="Arial,sans-serif" font-size="9" font-weight="700">OPEN</text>
+    <rect x="220" y="113" width="177" height="149" rx="17" fill="url(#panel)"/>
+    <text x="242" y="143" fill="#253254" font-family="Arial,sans-serif" font-size="13" font-weight="700">Progress</text>
+    <rect x="242" y="165" width="15" height="58" rx="5" fill="#bacbff"/>
+    <rect x="267" y="183" width="15" height="40" rx="5" fill="#8ca8f6"/>
+    <rect x="292" y="155" width="15" height="68" rx="5" fill="#637fe0"/>
+    <rect x="317" y="175" width="15" height="48" rx="5" fill="#aac0fa"/>
+    <rect x="342" y="147" width="15" height="76" rx="5" fill="#385ac9"/>
+    <path d="M242 229H374" stroke="#d2d9ea" stroke-width="2"/>
+    <rect x="382" y="49" width="160" height="152" rx="17" fill="url(#panel)"/>
+    <circle cx="462" cy="98" r="25" fill="#dff5e8"/>
+    <path d="m451 98 8 8 15-17" fill="none" stroke="#31a677" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="462" y="146" text-anchor="middle" fill="#253254" font-family="Arial,sans-serif" font-size="14" font-weight="700">Verified</text>
+    <text x="462" y="166" text-anchor="middle" fill="#8190aa" font-family="Arial,sans-serif" font-size="10">Ready to release</text>
+  </g>
+</svg>

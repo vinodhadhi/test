@@ -1,4 +1,4 @@
-﻿import { Activity, Boxes, Bug, LayoutDashboard, UsersRound } from 'lucide-react'
+﻿import { Activity, Boxes, ClipboardList, LayoutDashboard, UsersRound } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { WorkspaceShell } from './workspace-shell'
 
@@ -8,6 +8,6 @@ export function AdminLayout() {
     <NavLink to="/admin/progress"><Activity size={18} /> Progress dashboard</NavLink>
     <NavLink to="/admin/users"><UsersRound size={18} /> People</NavLink>
     <NavLink to="/admin/projects"><Boxes size={18} /> Projects & modules</NavLink>
-    <NavLink to="/bugs"><Bug size={18} /> Issue tracker</NavLink>
+    <NavLink to="/bugs"><ClipboardList size={18} /> Issue tracker</NavLink>
   </WorkspaceShell>
 }

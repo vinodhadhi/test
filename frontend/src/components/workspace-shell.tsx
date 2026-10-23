@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bug, ChevronRight, LogOut, Menu, Moon, Search, ShieldCheck, Sun, X } from 'lucide-react'
+import { ChevronRight, LogOut, Menu, Moon, Search, ShieldCheck, Sun, X } from 'lucide-react'
 import { Suspense, useState, type PropsWithChildren } from 'react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { endpoints } from '../api/client'
@@ -28,7 +28,7 @@ export function WorkspaceShell({ children }: PropsWithChildren) {
     <a className="skip-link" href="#main-content">Skip to content</a>
     <aside className="sidebar">
       <div className="sidebar-top">
-        <Link to="/" className="brand"><span className="brand-mark"><Bug size={21} /></span><span>QA Desk<small>QUALITY, TOGETHER</small></span></Link>
+        <Link to="/" className="brand"><span className="brand-mark">Q</span><span>QA Desk<small>QUALITY, TOGETHER</small></span></Link>
         <button className="mobile-menu-toggle" type="button" aria-label={navOpen ? 'Close navigation' : 'Open navigation'} aria-controls="workspace-navigation" aria-expanded={navOpen} onClick={() => setNavOpen(!navOpen)}>{navOpen ? <X size={20} /> : <Menu size={20} />}</button>
       </div>
       <div className="workspace-identity"><span className="workspace-monogram">QA</span><div><b>Product workspace</b><small>{me.data?.role} access</small></div><ShieldCheck size={16} /></div>
