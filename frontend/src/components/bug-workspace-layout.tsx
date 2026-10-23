@@ -1,20 +1,23 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bug, CircleUserRound, FolderKanban, LayoutDashboard, LogOut, Menu, Moon, Plus, Sun, UserPlus, UsersRound, X } from 'lucide-react'
-import { useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+﻿import { useQuery } from '@tanstack/react-query'
+import { Bug, FolderKanban, LayoutDashboard, Plus, UserPlus, UsersRound } from 'lucide-react'
+import { NavLink } from 'react-router-dom'
 import { endpoints } from '../api/client'
-import { Button } from './ui'
 import { DeveloperProjectMenu } from './developer-project-menu'
-import { Notifications } from './notifications'
-import { useTheme } from './use-theme'
+import { WorkspaceShell } from './workspace-shell'
 
 export function BugWorkspaceLayout() {
-  const client = useQueryClient()
-  const navigate = useNavigate()
-  const location = useLocation()
   const me = useQuery({ queryKey: ['me'], queryFn: endpoints.me })
-  const logout = useMutation({ mutationFn: endpoints.logout, onSettled: () => { client.clear(); navigate('/login', { replace: true }) } })
-  const { dark, toggleDark } = useTheme()
-  const [navOpen, setNavOpen] = useState(false)
-  return <div className="app-shell"><a className="skip-link" href="#main-content">Skip to content</a><aside className="sidebar"><div className="sidebar-top"><div className="brand"><span className="brand-mark"><Bug size={19} /></span><span>QA Desk<small>BUG TRACKING</small></span></div><button className="mobile-menu-toggle" type="button" aria-label={navOpen ? 'Close navigation' : 'Open navigation'} aria-controls="workspace-navigation" aria-expanded={navOpen} onClick={() => setNavOpen((open) => !open)}>{navOpen ? <X size={20} /> : <Menu size={20} />}</button></div><p className="nav-label">WORKSPACE</p><nav id="workspace-navigation" aria-label="Workspace navigation" className={`main-nav${navOpen ? ' nav-open' : ''}`} onClick={() => setNavOpen(false)}>{me.data?.role === 'Manager' && <><NavLink to="/dashboard"><LayoutDashboard size={17} /> Dashboard</NavLink><NavLink to="/bugs"><Bug size={17} /> All issues</NavLink><NavLink to="/project-management"><FolderKanban size={17} /> Projects & modules</NavLink><NavLink to="/team-management"><UsersRound size={17} /> Team assignments</NavLink><NavLink to="/team-accounts"><UserPlus size={17} /> Create team accounts</NavLink></>}{me.data?.role !== 'Manager' && <>{(me.data?.role === 'Tester' || me.data?.role === 'Developer') && <NavLink to="/my-dashboard"><LayoutDashboard size={17} /> Dashboard</NavLink>}{me.data?.role === 'Developer' ? <DeveloperProjectMenu /> : <NavLink to="/bugs" end><Bug size={17} /> {me.data?.role === 'Admin' ? 'All issues' : 'My bugs'}</NavLink>}{(me.data?.role === 'Tester' || me.data?.role === 'Admin') && <NavLink to="/bugs/new"><Plus size={17} /> Report a bug</NavLink>}{me.data?.role === 'Admin' && <NavLink to="/admin"><LayoutDashboard size={17} /> Administration</NavLink>}</>}</nav><div className="sidebar-footer"><span className="status-dot" /> Project access is role based</div></aside><main className="main-area"><header className="topbar"><div className="breadcrumb">Workspace <span>/</span> {me.data?.role === 'Developer' ? 'Developer workspace' : me.data?.role === 'Tester' ? 'Tester workspace' : me.data?.role === 'Manager' ? 'Manager workspace' : 'Bug tracking'}</div><div className="top-actions"><Notifications /><Button variant="ghost" aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'} aria-pressed={dark} onClick={toggleDark} className="icon-button"><Sun className="sun-icon" size={17} /><Moon className="moon-icon" size={17} /></Button><div className="profile"><div className="avatar">{me.data?.full_name.split(' ').map((part) => part[0]).slice(0, 2).join('') || <CircleUserRound size={17} />}</div><div className="profile-copy"><b>{me.data?.full_name}</b><small>{me.data?.role}</small></div></div><Button variant="ghost" onClick={() => logout.mutate()} title="Sign out" aria-label="Sign out" className="icon-button"><LogOut size={17} /></Button></div></header><div className="content" id="main-content"><div className="page-transition" key={location.pathname}><Outlet /></div></div></main></div>
+  const role = me.data?.role
+  return <WorkspaceShell>{role === 'Manager' ? <>
+    <NavLink to="/dashboard"><LayoutDashboard size={18} /> Dashboard</NavLink>
+    <NavLink to="/bugs"><Bug size={18} /> All issues</NavLink>
+    <NavLink to="/project-management"><FolderKanban size={18} /> Projects & modules</NavLink>
+    <NavLink to="/team-management"><UsersRound size={18} /> Team assignments</NavLink>
+    <NavLink to="/team-accounts"><UserPlus size={18} /> Team accounts</NavLink>
+  </> : <>
+    {(role === 'Tester' || role === 'Developer') && <NavLink to="/my-dashboard"><LayoutDashboard size={18} /> Dashboard</NavLink>}
+    {role === 'Developer' ? <DeveloperProjectMenu /> : <NavLink to="/bugs" end><Bug size={18} /> {role === 'Admin' ? 'All issues' : 'My bugs'}</NavLink>}
+    {(role === 'Tester' || role === 'Admin') && <NavLink to="/bugs/new"><Plus size={18} /> Report a bug</NavLink>}
+    {role === 'Admin' && <NavLink to="/admin"><LayoutDashboard size={18} /> Administration</NavLink>}
+  </>}</WorkspaceShell>
 }

@@ -58,6 +58,10 @@ python -m pytest
 
 Frontend check (from `frontend`): `npm run build`.
 
+Frontend rendering checks: `npm run test:smoke`. These use isolated fixture data without contacting the API and cover login controls, role-specific dashboard actions, zero-issue progress, active filters, and invalid pagination. They do not replace browser interaction or responsive-layout testing.
+
+The UI uses a shared workspace shell and theme in `frontend/src/workspace.css`. Feature pages load on demand, with loading and recovery states. Queries reuse fresh results for 30 seconds; existing mutation invalidation and live notifications still refresh changed data.
+
 ## Roles and security
 
 - **Admin:** user and project administration, bug access, reporting, dashboards.
