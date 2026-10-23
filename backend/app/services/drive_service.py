@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from io import BytesIO
+import json
 from pathlib import Path
 import re
 from threading import RLock
@@ -62,18 +63,26 @@ class DriveService:
             if not settings.drive_shared_folder_id:
                 raise DriveStorageError("Set DRIVE_SHARED_FOLDER_ID to the Google Drive upload folder")
             try:
-                if token_path.is_file():
+                if settings.google_drive_oauth_token_json:
+                    credentials = Credentials.from_authorized_user_info(json.loads(settings.google_drive_oauth_token_json), scopes=[DRIVE_SCOPE])
+                    if not credentials.valid:
+                        if not credentials.refresh_token:
+                            raise DriveStorageError("Google Drive authorization expired; authorize the account again")
+                        credentials.refresh(Request())
+                elif token_path.is_file():
                     credentials = Credentials.from_authorized_user_file(str(token_path), scopes=[DRIVE_SCOPE])
                     if not credentials.valid:
                         if not credentials.refresh_token:
                             raise DriveStorageError("Google Drive authorization expired; authorize the account again")
                         credentials.refresh(Request())
+                elif settings.google_service_account_json:
+                    credentials = service_account.Credentials.from_service_account_info(json.loads(settings.google_service_account_json), scopes=[DRIVE_SCOPE])
                 elif credentials_path and Path(credentials_path).is_file():
                     credentials = service_account.Credentials.from_service_account_file(credentials_path, scopes=[DRIVE_SCOPE])
                 else:
                     raise DriveStorageError("Google Drive credentials are not available on the backend host")
                 self._client = build("drive", "v3", credentials=credentials, cache_discovery=False)
-            except (OSError, ValueError, GoogleAuthError) as exc:
+            except (OSError, ValueError, TypeError, GoogleAuthError) as exc:
                 raise DriveStorageError("Could not load or refresh Google Drive credentials") from exc
         return self._client
 
@@ -126,7 +135,7 @@ class DriveService:
             except OSError as exc:
                 raise DriveStorageError("Local attachment could not be saved") from exc
             return DriveUpload(file_id=file_id, path=f"local://{project_id}/{bug_no}/{file_id.removeprefix('local:')}")
-        if self._client is None and not Path(settings.google_drive_oauth_token_file).is_file() and (not settings.google_application_credentials or not Path(settings.google_application_credentials).is_file()):
+        if self._client is None and not (settings.google_drive_oauth_token_json or settings.google_service_account_json or Path(settings.google_drive_oauth_token_file).is_file() or (settings.google_application_credentials and Path(settings.google_application_credentials).is_file())):
             raise DriveStorageError("Google Drive credentials are not available on the backend host")
         if not settings.drive_shared_folder_id:
             raise DriveStorageError("DRIVE_SHARED_FOLDER_ID is not configured")

@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     login_lockout_minutes: int = 15
     drive_shared_folder_id: str = ""
     google_application_credentials: str = ""
+    google_service_account_json: str = ""
+    google_drive_oauth_token_json: str = ""
     google_drive_oauth_token_file: str = str(Path(__file__).resolve().parents[3] / "secrets" / "google-drive-token.json")
     attachment_storage: Literal["drive", "local"] = "drive"
     recording_retention_days: int = 90

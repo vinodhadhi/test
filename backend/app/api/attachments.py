@@ -28,6 +28,8 @@ def attachment_storage_status(_actor: User = Depends(current_user)) -> dict[str,
     configured = settings.attachment_storage == "local" or bool(
         settings.drive_shared_folder_id and (
             Path(settings.google_drive_oauth_token_file).is_file()
+            or settings.google_drive_oauth_token_json
+            or settings.google_service_account_json
             or settings.google_application_credentials and Path(settings.google_application_credentials).is_file()
         )
     )
