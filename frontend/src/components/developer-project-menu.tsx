@@ -10,7 +10,7 @@ export function DeveloperProjectMenu() {
   const selected = location.pathname === '/bugs' ? new URLSearchParams(location.search).get('project') : null
   return <details className="developer-project-menu">
     <summary onClick={(event) => event.stopPropagation()}><FolderKanban size={17} /><span>Projects</span>
-      <span className="project-menu-count" aria-label={`${projects.data?.length ?? 0} projects`}>{projects.isSuccess ? projects.data.length : '—'}</span><ChevronDown size={15} />
+      <ChevronDown size={15} />
     </summary>
     <div className="developer-project-submenu">
       {projects.isPending ? <p role="status">Loading projects…</p> : projects.isError ? <div role="alert"><p>Could not load projects.</p><button type="button" onClick={(event) => { event.stopPropagation(); projects.refetch() }}>Retry</button></div>
@@ -19,3 +19,6 @@ export function DeveloperProjectMenu() {
     </div>
   </details>
 }
+
+
+

@@ -1,4 +1,5 @@
 from typing import Annotated, Literal
+from pydantic import BaseModel, Field
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import String, cast, func, or_, select
@@ -26,6 +27,38 @@ from app.services.bug_access import require_bug_access
 from app.services.bug_workflow import transition_bug
 
 router = APIRouter(prefix="/bugs", tags=["Bugs"])
+
+
+class HandoffRequest(BaseModel):
+    recipient_role: Literal["Developer", "Tester"]
+    recipient_id: int = Field(gt=0)
+
+
+@router.post("/{bug_id}/handoff", response_model=BugOut, dependencies=[Depends(require_csrf)])
+def handoff_bug(bug_id: int, payload: HandoffRequest, actor: User = Depends(current_user), db: Session = Depends(get_db)) -> BugOut:
+    bug = _bug_or_404(db, bug_id, lock=True)
+    if actor.role != UserRole.TESTER or bug.reported_by != actor.id:
+        raise HTTPException(status_code=403, detail="Only the reporting tester can hand off this issue")
+    if bug.status not in {BugStatus.OPEN, BugStatus.REOPENED}:
+        raise HTTPException(status_code=409, detail="Only open or reopened issues can be handed off")
+    recipient = db.get(User, payload.recipient_id)
+    member = db.scalar(select(ProjectMember.user_id).where(ProjectMember.project_id == bug.project_id, ProjectMember.user_id == payload.recipient_id))
+    if recipient is None or not recipient.is_active or recipient.role.value != payload.recipient_role or member is None:
+        raise HTTPException(status_code=422, detail="Choose an active team member in this project")
+    if payload.recipient_role == "Developer":
+        if recipient.id == bug.assigned_to:
+            raise HTTPException(status_code=422, detail="Choose a different developer")
+        bug.assigned_to = recipient.id
+        title = "Issue assigned to you"
+    else:
+        if recipient.id == bug.reported_by:
+            raise HTTPException(status_code=422, detail="Choose a different tester")
+        bug.reported_by = recipient.id
+        title = "Issue handed to you"
+    db.add(Notification(user_id=recipient.id, kind="bug_handoff", title=title, message=f"{actor.full_name} handed off {bug.project.name} #{bug.bug_no}: {bug.title}"[:500], link=f"/bugs/{bug.id}"))
+    db.commit()
+    db.expire_all()
+    return _bug_out(db, _bug_or_404(db, bug_id), include_thread=True)
 def _bug_or_404(db: Session, bug_id: int, *, lock: bool = False) -> Bug:
     if lock and db.scalar(select(Bug.id).where(Bug.id == bug_id).with_for_update()) is None:
         raise HTTPException(status_code=404, detail="Bug not found")
